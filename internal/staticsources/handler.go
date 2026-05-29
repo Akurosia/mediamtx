@@ -17,6 +17,7 @@ import (
 	ssrtmp "github.com/bluenviron/mediamtx/internal/staticsources/rtmp"
 	ssrtp "github.com/bluenviron/mediamtx/internal/staticsources/rtp"
 	ssrtsp "github.com/bluenviron/mediamtx/internal/staticsources/rtsp"
+	ssomt "github.com/bluenviron/mediamtx/internal/staticsources/omt"
 	sssrt "github.com/bluenviron/mediamtx/internal/staticsources/srt"
 	sswebrtc "github.com/bluenviron/mediamtx/internal/staticsources/webrtc"
 )
@@ -139,6 +140,12 @@ func (s *Handler) Initialize() {
 
 	case strings.HasPrefix(s.Conf.Source, "srt://"):
 		s.instance = &sssrt.Source{
+			ReadTimeout: s.ReadTimeout,
+			Parent:      s,
+		}
+
+	case strings.HasPrefix(s.Conf.Source, "omt://"):
+		s.instance = &ssomt.Source{
 			ReadTimeout: s.ReadTimeout,
 			Parent:      s,
 		}

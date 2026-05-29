@@ -394,6 +394,10 @@ type Conf struct {
 	SRT        bool   `json:"srt"`
 	SRTAddress string `json:"srtAddress"`
 
+	// OMT server
+	OMT        bool   `json:"omt"`
+	OMTAddress string `json:"omtAddress"`
+
 	// Record (deprecated)
 	Record                *bool         `json:"record,omitempty" deprecated:"true"`
 	RecordPath            *string       `json:"recordPath,omitempty" deprecated:"true"`
@@ -521,6 +525,10 @@ func (conf *Conf) setDefaults() {
 	// SRT server
 	conf.SRT = true
 	conf.SRTAddress = ":8890"
+
+	// OMT server
+	conf.OMT = true
+	conf.OMTAddress = ":9800"
 
 	conf.PathDefaults.setDefaults()
 }
@@ -1020,6 +1028,17 @@ func (conf *Conf) Validate(l logger.Writer) error {
 			if !conf.WebRTCIPsFromInterfaces && len(conf.WebRTCAdditionalHosts) == 0 {
 				return fmt.Errorf("at least one between 'webrtcIPsFromInterfaces' or 'webrtcAdditionalHosts' must be filled")
 			}
+		}
+	}
+
+	// OMT
+
+	if conf.OMT {
+		if conf.OMTAddress == "" {
+			return fmt.Errorf("'omtAddress' must be set when OMT is enabled")
+		}
+		if _, _, err := net.SplitHostPort(conf.OMTAddress); err != nil {
+			return fmt.Errorf("invalid 'omtAddress': %w", err)
 		}
 	}
 
