@@ -3,133 +3,94 @@ package dnssd
 import (
 	"context"
 	"fmt"
-	"net"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/bluenviron/mediamtx/internal/logger"
-	"github.com/grandcat/zeroconf"
 )
 
 const (
 	serviceType = "_omt._tcp"
 	domain      = "local."
-	browseTTL   = 5 * time.Second
 )
 
+// Parent is implemented by the caller (OMT server).
 type Parent interface {
 	logger.Writer
 }
 
-type ServiceEntry struct {
-	Name string
-	Host string
-	Port int
-	Addr net.IP
-}
-
+// Manager handles DNS-SD service registration using native system tools.
+// On macOS it delegates to dns-sd (which talks to mDNSResponder).
+// On Linux it delegates to avahi-publish-service (which talks to avahi-daemon).
 type Manager struct {
 	InstanceName string
 	Port         int
 	Parent       Parent
 
-	mu       sync.Mutex
-	server   *zeroconf.Server
-	ctx      context.Context
-	ctxCancel func()
+	mu        sync.Mutex
+	cmd       *exec.Cmd
+	ctx       context.Context
+	ctxCancel context.CancelFunc
 }
 
+// Initialize prepares the manager context.
 func (m *Manager) Initialize() error {
 	m.ctx, m.ctxCancel = context.WithCancel(context.Background())
 	return nil
 }
 
+// Publish registers the service via the platform's native DNS-SD tool.
 func (m *Manager) Publish() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.server != nil {
+	if m.cmd != nil {
 		return nil
 	}
 
-	var err error
-	m.server, err = zeroconf.Register(
-		m.InstanceName,
-		serviceType,
-		domain,
-		m.Port,
-		nil,
-		nil,
-	)
-	if err != nil {
+	portStr := strconv.Itoa(m.Port)
+
+	switch runtime.GOOS {
+	case "darwin":
+		// dns-sd -R <name> <type> <domain> <port>
+		m.cmd = exec.CommandContext(m.ctx, "dns-sd", "-R",
+			m.InstanceName, serviceType, domain, portStr)
+
+	case "linux":
+		// avahi-publish-service <name> <type> <port>
+		m.cmd = exec.CommandContext(m.ctx, "avahi-publish-service",
+			m.InstanceName, serviceType, portStr)
+
+	default:
+		m.Parent.Log(logger.Warn, "DNS-SD: unsupported platform %s, skipping registration", runtime.GOOS)
+		return nil
+	}
+
+	// Both commands run as daemons (block until killed).
+	// Start them in the background; context cancellation will terminate them.
+	if err := m.cmd.Start(); err != nil {
+		m.cmd = nil
 		return fmt.Errorf("DNS-SD register: %w", err)
 	}
+
+	// Reap the process in background to avoid zombies.
+	go func() {
+		_ = m.cmd.Wait()
+	}()
 
 	m.Parent.Log(logger.Info, "DNS-SD: published %s on port %d", m.InstanceName, m.Port)
 	return nil
 }
 
-func (m *Manager) Unpublish() {
+// Close stops the registration process.
+func (m *Manager) Close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.server != nil {
-		m.server.Shutdown()
-		m.server = nil
-	}
-}
-
-func (m *Manager) Browse() ([]ServiceEntry, error) {
-	if m.ctx == nil {
-		return nil, fmt.Errorf("DNS-SD manager not initialized")
-	}
-
-	resolver, err := zeroconf.NewResolver(nil)
-	if err != nil {
-		return nil, fmt.Errorf("DNS-SD resolver: %w", err)
-	}
-
-	entries := make(chan *zeroconf.ServiceEntry)
-	var results []ServiceEntry
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for e := range entries {
-			var addr net.IP
-			if len(e.AddrIPv4) > 0 {
-				addr = e.AddrIPv4[0]
-			} else if len(e.AddrIPv6) > 0 {
-				addr = e.AddrIPv6[0]
-			}
-			results = append(results, ServiceEntry{
-				Name: e.Instance,
-				Host: net.JoinHostPort(e.HostName, strconv.Itoa(e.Port)),
-				Port: e.Port,
-				Addr: addr,
-			})
-		}
-	}()
-
-	browseCtx, browseCancel := context.WithTimeout(m.ctx, browseTTL)
-	defer browseCancel()
-
-	err = resolver.Browse(browseCtx, serviceType, domain, entries)
-	if err != nil {
-		return nil, fmt.Errorf("DNS-SD browse: %w", err)
-	}
-
-	<-browseCtx.Done()
-	wg.Wait()
-
-	return results, nil
-}
-
-func (m *Manager) Close() {
-	m.Unpublish()
 	if m.ctxCancel != nil {
 		m.ctxCancel()
 	}
+	m.cmd = nil
 }
