@@ -12,6 +12,7 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/google/uuid"
 
+	"github.com/bluenviron/mediamtx/internal/auth"
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/externalcmd"
@@ -152,6 +153,9 @@ func (c *conn) runPublish(reader *omt.Reader, firstFrame *omt.Frame) error {
 		AccessRequest: defs.PathAccessRequest{
 			Name:    c.pathName,
 			Publish: true,
+			Proto:   auth.ProtocolOMT,
+			ID:      &c.uuid,
+			Credentials: &auth.Credentials{},
 			IP:      c.ip(),
 		},
 	})
@@ -231,8 +235,11 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 	res, err := c.pathManager.AddReader(defs.PathAddReaderReq{
 		Author: c,
 		AccessRequest: defs.PathAccessRequest{
-			Name: c.pathName,
-			IP:   c.ip(),
+			Name:        c.pathName,
+			Proto:       auth.ProtocolOMT,
+			ID:          &c.uuid,
+			Credentials: &auth.Credentials{},
+			IP:          c.ip(),
 		},
 	})
 	if err != nil {
