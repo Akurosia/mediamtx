@@ -2,10 +2,11 @@ package dnssd
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/bluenviron/mediamtx/internal/logger"
@@ -21,76 +22,113 @@ type Parent interface {
 	logger.Writer
 }
 
+// registration tracks a single dns-sd/avahi process for one service instance.
+type registration struct {
+	cmd    *exec.Cmd
+	cancel context.CancelFunc
+}
+
 // Manager handles DNS-SD service registration using native system tools.
+// It supports multiple concurrent registrations (one per path/stream).
 // On macOS it delegates to dns-sd (which talks to mDNSResponder).
 // On Linux it delegates to avahi-publish-service (which talks to avahi-daemon).
 type Manager struct {
-	InstanceName string
-	Port         int
-	Parent       Parent
+	Port   int
+	Parent Parent
 
-	mu        sync.Mutex
-	cmd       *exec.Cmd
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	mu            sync.Mutex
+	registrations map[string]*registration
+	hostname      string
 }
 
-// Initialize prepares the manager context.
+// Initialize prepares the manager.
 func (m *Manager) Initialize() error {
-	m.ctx, m.ctxCancel = context.WithCancel(context.Background())
+	m.registrations = make(map[string]*registration)
+
+	h, err := os.Hostname()
+	if err != nil {
+		h = "mediamtx"
+	}
+	m.hostname = strings.TrimSuffix(h, ".local")
+
 	return nil
 }
 
-// Publish registers the service via the platform's native DNS-SD tool.
-func (m *Manager) Publish() error {
+// instanceName builds the DNS-SD instance name for a given path.
+// Format: "hostname (pathName)" — matches OMT Signal Generator convention.
+func (m *Manager) instanceName(pathName string) string {
+	return m.hostname + " (" + pathName + ")"
+}
+
+// Register registers a DNS-SD service for the given path name.
+func (m *Manager) Register(pathName string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.cmd != nil {
-		return nil
+	if _, exists := m.registrations[pathName]; exists {
+		return
 	}
 
+	name := m.instanceName(pathName)
 	portStr := strconv.Itoa(m.Port)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		// dns-sd -R <name> <type> <domain> <port>
-		m.cmd = exec.CommandContext(m.ctx, "dns-sd", "-R",
-			m.InstanceName, serviceType, domain, portStr)
-
+		cmd = exec.CommandContext(ctx, "dns-sd", "-R", name, serviceType, domain, portStr)
 	case "linux":
-		// avahi-publish-service <name> <type> <port>
-		m.cmd = exec.CommandContext(m.ctx, "avahi-publish-service",
-			m.InstanceName, serviceType, portStr)
-
+		cmd = exec.CommandContext(ctx, "avahi-publish-service", name, serviceType, portStr)
 	default:
+		cancel()
 		m.Parent.Log(logger.Warn, "DNS-SD: unsupported platform %s, skipping registration", runtime.GOOS)
-		return nil
+		return
 	}
 
-	// Both commands run as daemons (block until killed).
-	// Start them in the background; context cancellation will terminate them.
-	if err := m.cmd.Start(); err != nil {
-		m.cmd = nil
-		return fmt.Errorf("DNS-SD register: %w", err)
+	if err := cmd.Start(); err != nil {
+		cancel()
+		m.Parent.Log(logger.Warn, "DNS-SD register %q: %v", name, err)
+		return
 	}
 
-	// Reap the process in background to avoid zombies.
+	// Reap process in background.
 	go func() {
-		_ = m.cmd.Wait()
+		_ = cmd.Wait()
 	}()
 
-	m.Parent.Log(logger.Info, "DNS-SD: published %s on port %d", m.InstanceName, m.Port)
-	return nil
+	m.registrations[pathName] = &registration{cmd: cmd, cancel: cancel}
+	m.Parent.Log(logger.Info, "DNS-SD: registered %q on port %d", name, m.Port)
 }
 
-// Close stops the registration process.
+// Deregister removes the DNS-SD service for the given path name.
+func (m *Manager) Deregister(pathName string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	reg, exists := m.registrations[pathName]
+	if !exists {
+		return
+	}
+
+	reg.cancel()
+	delete(m.registrations, pathName)
+
+	name := m.instanceName(pathName)
+	m.Parent.Log(logger.Info, "DNS-SD: deregistered %q", name)
+}
+
+// Close stops all registrations.
 func (m *Manager) Close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.ctxCancel != nil {
-		m.ctxCancel()
+	for pathName, reg := range m.registrations {
+		reg.cancel()
+		name := m.instanceName(pathName)
+		m.Parent.Log(logger.Info, "DNS-SD: deregistered %q", name)
 	}
-	m.cmd = nil
+	m.registrations = nil
 }
+
+

@@ -14,6 +14,7 @@ import (
 	"github.com/bluenviron/mediamtx/internal/logger"
 	"github.com/bluenviron/mediamtx/internal/metrics"
 	"github.com/bluenviron/mediamtx/internal/servers/hls"
+	"github.com/bluenviron/mediamtx/internal/servers/omt"
 )
 
 func pathConfCanBeUpdated(oldPathConf *conf.Path, newPathConf *conf.Path) bool {
@@ -61,6 +62,15 @@ type pathSetHLSServerReq struct {
 	res chan pathSetHLSServerRes
 }
 
+type pathSetOMTServerRes struct {
+	readyPaths []defs.Path
+}
+
+type pathSetOMTServerReq struct {
+	s   *omt.Server
+	res chan pathSetOMTServerRes
+}
+
 type pathManagerAuthManager interface {
 	Authenticate(req *auth.Request) (string, *auth.Error)
 }
@@ -88,11 +98,13 @@ type pathManager struct {
 	ctxCancel func()
 	wg        sync.WaitGroup
 	hlsServer *hls.Server
+	omtServer *omt.Server
 	paths     map[string]*path
 
 	// in
 	chReloadConf      chan map[string]*conf.Path
 	chSetHLSServer    chan pathSetHLSServerReq
+	chSetOMTServer    chan pathSetOMTServerReq
 	chRemovePath      chan *path
 	chClosePathIfIdle chan *path
 	chSetPathReady    chan *path
@@ -113,6 +125,7 @@ func (pm *pathManager) initialize() {
 	pm.paths = make(map[string]*path)
 	pm.chReloadConf = make(chan map[string]*conf.Path)
 	pm.chSetHLSServer = make(chan pathSetHLSServerReq)
+	pm.chSetOMTServer = make(chan pathSetOMTServerReq)
 	pm.chRemovePath = make(chan *path)
 	pm.chClosePathIfIdle = make(chan *path)
 	pm.chSetPathReady = make(chan *path)
@@ -168,6 +181,10 @@ outer:
 		case req := <-pm.chSetHLSServer:
 			readyPaths := pm.doSetHLSServer(req.s)
 			req.res <- pathSetHLSServerRes{readyPaths: readyPaths}
+
+		case req := <-pm.chSetOMTServer:
+			readyPaths := pm.doSetOMTServer(req.s)
+			req.res <- pathSetOMTServerRes{readyPaths: readyPaths}
 
 		case pa := <-pm.chRemovePath:
 			if pa2, ok := pm.paths[pa.name]; ok && pa2 == pa {
@@ -295,6 +312,20 @@ func (pm *pathManager) doSetHLSServer(m *hls.Server) []defs.Path {
 	return ret
 }
 
+func (pm *pathManager) doSetOMTServer(m *omt.Server) []defs.Path {
+	pm.omtServer = m
+
+	var ret []defs.Path
+
+	for _, pa := range pm.paths {
+		if pa.ready {
+			ret = append(ret, pa)
+		}
+	}
+
+	return ret
+}
+
 func (pm *pathManager) doSetPathReady(pa *path) {
 	if pa2, ok := pm.paths[pa.name]; !ok || pa2 != pa {
 		return
@@ -304,6 +335,9 @@ func (pm *pathManager) doSetPathReady(pa *path) {
 
 	if pm.hlsServer != nil {
 		pm.hlsServer.PathReady(pa)
+	}
+	if pm.omtServer != nil {
+		pm.omtServer.PathReady(pa)
 	}
 }
 
@@ -316,6 +350,9 @@ func (pm *pathManager) doSetPathNotReady(pa *path) {
 
 	if pm.hlsServer != nil {
 		pm.hlsServer.PathNotReady(pa)
+	}
+	if pm.omtServer != nil {
+		pm.omtServer.PathNotReady(pa)
 	}
 }
 
@@ -616,6 +653,23 @@ func (pm *pathManager) SetHLSServer(s *hls.Server) []defs.Path {
 
 	select {
 	case pm.chSetHLSServer <- req:
+		res := <-req.res
+		return res.readyPaths
+
+	case <-pm.ctx.Done():
+		return nil
+	}
+}
+
+// SetOMTServer is called by omt.Server.
+func (pm *pathManager) SetOMTServer(s *omt.Server) []defs.Path {
+	req := pathSetOMTServerReq{
+		s:   s,
+		res: make(chan pathSetOMTServerRes),
+	}
+
+	select {
+	case pm.chSetOMTServer <- req:
 		res := <-req.res
 		return res.readyPaths
 
