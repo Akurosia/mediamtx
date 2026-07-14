@@ -111,6 +111,7 @@ components:
         - rtspsConn
         - rtspsSession
         - srtConn
+        - omtConn
         - webRTCSession
         - moqSession
         - hidden
@@ -134,6 +135,8 @@ components:
         - webRTCSession
         - webRTCSource
         - moqSession
+        - omtConn
+        - omtSource
 
     PathTrackCodec:
       type: string
@@ -447,6 +450,11 @@ components:
         multicastSRTPPort:
           type: integer
           format: int64
+        omt:
+          type: boolean
+          description: OMT server
+        omtAddress:
+          type: string
         playback:
           type: boolean
           description: Playback
@@ -612,6 +620,11 @@ components:
         srtAddress:
           type: string
         srtcpAddress:
+          type: string
+        srtla:
+          type: boolean
+          description: SRTLA server
+        srtlaAddress:
           type: string
         srtpAddress:
           type: string
