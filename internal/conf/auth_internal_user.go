@@ -4,6 +4,7 @@ package conf
 type AuthInternalUser struct {
 	User        Credential                   `json:"user"`
 	Pass        Credential                   `json:"pass"`
+	StreamKey   Credential                   `json:"streamkey"`
 	IPs         IPNetworks                   `json:"ips"`
 	Permissions []AuthInternalUserPermission `json:"permissions"`
 }

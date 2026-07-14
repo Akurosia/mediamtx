@@ -88,6 +88,15 @@ func getToken(tokenInHTTPQuery bool, req *Request) string {
 	return ""
 }
 
+func getStreamKey(req *Request) string {
+	v, err := url.ParseQuery(req.Query)
+	if err != nil {
+		return ""
+	}
+
+	return v.Get("key")
+}
+
 // Manager is the authentication manager.
 type Manager struct {
 	Method             conf.AuthMethod
@@ -141,7 +150,7 @@ func (m *Manager) Authenticate(req *Request) (string, *Error) {
 	if err != nil {
 		return "", &Error{
 			Wrapped:        err,
-			AskCredentials: (req.Credentials.User == "" && req.Credentials.Pass == "" && token == ""),
+			AskCredentials: (req.Credentials.User == "" && req.Credentials.Pass == "" && getStreamKey(req) == "" && token == ""),
 		}
 	}
 
@@ -154,7 +163,11 @@ func (m *Manager) authenticateInternal(req *Request) (string, error) {
 
 	for _, u := range m.InternalUsers {
 		if ok := m.authenticateWithUser(req, &u); ok {
-			return req.Credentials.User, nil
+			if u.User == "any" {
+				return req.Credentials.User, nil
+			}
+
+			return string(u.User), nil
 		}
 	}
 
@@ -174,7 +187,12 @@ func (m *Manager) authenticateWithUser(
 	}
 
 	if u.User != "any" {
-		if req.CustomVerifyFunc != nil {
+		streamKey := getStreamKey(req)
+		if streamKey != "" && u.StreamKey != "" {
+			if !u.StreamKey.Check(streamKey) {
+				return false
+			}
+		} else if req.CustomVerifyFunc != nil {
 			if ok := req.CustomVerifyFunc(string(u.User), string(u.Pass)); !ok {
 				return false
 			}
