@@ -36,6 +36,7 @@ import (
 	"github.com/bluenviron/mediamtx/internal/servers/rtsp"
 	"github.com/bluenviron/mediamtx/internal/servers/srt"
 	"github.com/bluenviron/mediamtx/internal/servers/srtla"
+	"github.com/bluenviron/mediamtx/internal/servers/omt"
 	"github.com/bluenviron/mediamtx/internal/servers/webrtc"
 	"github.com/bluenviron/mediamtx/internal/upgrade"
 )
@@ -129,6 +130,7 @@ type Core struct {
 	srtServer       *srt.Server
 	moqServer       *moq.Server
 	srtlaServer     *srtla.Server
+	omtServer       *omt.Server
 	api             *api.API
 	confWatcher     *confwatcher.ConfWatcher
 
@@ -742,6 +744,27 @@ func (p *Core) createResources(initial bool) error {
 		p.srtServer.SRTLALinker = i
 	}
 
+	if p.conf.OMT &&
+		p.omtServer == nil {
+		i := &omt.Server{
+			Address:             p.conf.OMTAddress,
+			RTSPAddress:         p.conf.RTSPAddress,
+			ReadTimeout:         p.conf.ReadTimeout,
+			WriteTimeout:        p.conf.WriteTimeout,
+			RunOnConnect:        p.conf.RunOnConnect,
+			RunOnConnectRestart: p.conf.RunOnConnectRestart,
+			RunOnDisconnect:     p.conf.RunOnDisconnect,
+			ExternalCmdPool:     p.externalCmdPool,
+			PathManager:         p.pathManager,
+			Parent:              p,
+		}
+		err = i.Initialize()
+		if err != nil {
+			return err
+		}
+		p.omtServer = i
+	}
+
 	if p.conf.API &&
 		p.api == nil {
 		i := &api.API{
@@ -1050,6 +1073,18 @@ func (p *Core) closeResources(newConf *conf.Conf, calledByAPI bool) {
 		closeSRTServer ||
 		closeLogger
 
+	closeOMTServer := newConf == nil ||
+		newConf.OMT != p.conf.OMT ||
+		newConf.OMTAddress != p.conf.OMTAddress ||
+		newConf.RTSPAddress != p.conf.RTSPAddress ||
+		newConf.ReadTimeout != p.conf.ReadTimeout ||
+		newConf.WriteTimeout != p.conf.WriteTimeout ||
+		newConf.RunOnConnect != p.conf.RunOnConnect ||
+		newConf.RunOnConnectRestart != p.conf.RunOnConnectRestart ||
+		newConf.RunOnDisconnect != p.conf.RunOnDisconnect ||
+		closePathManager ||
+		closeLogger
+		
 	closeAPI := newConf == nil ||
 		newConf.API != p.conf.API ||
 		newConf.APIAddress != p.conf.APIAddress ||
@@ -1102,6 +1137,11 @@ func (p *Core) closeResources(newConf *conf.Conf, calledByAPI bool) {
 		p.moqServer = nil
 	}
 
+	if closeOMTServer && p.omtServer != nil {
+		p.omtServer.Close()
+		p.omtServer = nil
+	}
+	
 	if closeWebRTCServer && p.webRTCServer != nil {
 		p.webRTCServer.Close()
 		p.webRTCServer = nil

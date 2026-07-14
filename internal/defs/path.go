@@ -2,6 +2,7 @@ package defs
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 
@@ -60,6 +61,7 @@ type PathDescribeReq struct {
 type PathAddPublisherRes struct {
 	Path      Path
 	User      string
+	JWTExpiry time.Time
 	SubStream *stream.SubStream
 	Err       error
 }
@@ -72,6 +74,7 @@ type PathAddPublisherReq struct {
 	ReplaceNTP    bool
 	ConfToCompare *conf.Path
 	AccessRequest PathAccessRequest
+	JWTExpiry     time.Time
 	Res           chan PathAddPublisherRes
 }
 
@@ -83,16 +86,18 @@ type PathRemovePublisherReq struct {
 
 // PathAddReaderRes contains the response of AddReader().
 type PathAddReaderRes struct {
-	Path   Path
-	User   string
-	Stream *stream.Stream
-	Err    error
+	Path      Path
+	User      string
+	JWTExpiry time.Time
+	Stream    *stream.Stream
+	Err       error
 }
 
 // PathAddReaderReq contains arguments of AddReader().
 type PathAddReaderReq struct {
 	Author        Reader
 	AccessRequest PathAccessRequest
+	JWTExpiry     time.Time
 	Res           chan PathAddReaderRes
 }
 

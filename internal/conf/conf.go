@@ -411,6 +411,10 @@ type Conf struct {
 	SRTLA        bool   `json:"srtla"`
 	SRTLAAddress string `json:"srtlaAddress"`
 
+	// OMT server
+	OMT        bool   `json:"omt"`
+	OMTAddress string `json:"omtAddress"`
+	
 	// Record (deprecated)
 	Record                *bool         `json:"record,omitempty" deprecated:"true"`
 	RecordPath            *string       `json:"recordPath,omitempty" deprecated:"true"`
@@ -551,6 +555,10 @@ func (conf *Conf) setDefaults() {
 	conf.SRTLA = true
 	conf.SRTLAAddress = ":8891"
 
+	// OMT server
+	conf.OMT = true
+	conf.OMTAddress = ":9800"
+	
 	conf.PathDefaults.setDefaults()
 }
 
@@ -1064,6 +1072,17 @@ func (conf *Conf) Validate(l logger.Writer) error {
 		conf.MoQHTTP3Address = *conf.MoQHTTPS3Address
 	}
 
+	// OMT
+
+	if conf.OMT {
+		if conf.OMTAddress == "" {
+			return fmt.Errorf("'omtAddress' must be set when OMT is enabled")
+		}
+		if _, _, err := net.SplitHostPort(conf.OMTAddress); err != nil {
+			return fmt.Errorf("invalid 'omtAddress': %w", err)
+		}
+	}
+	
 	// Record (deprecated)
 
 	if conf.SRTLA {

@@ -18,6 +18,7 @@ const (
 	ProtocolWebRTC Protocol = "webrtc"
 	ProtocolSRT    Protocol = "srt"
 	ProtocolMoQ    Protocol = "moq"
+	ProtocolOMT    Protocol = "omt"
 )
 
 // Request is an authentication request.
