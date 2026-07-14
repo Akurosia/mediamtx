@@ -258,7 +258,7 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 	// Set up stream reader.
 	r := &stream.Reader{Parent: c}
 
-	desc := res.Stream.Desc
+	desc := res.Stream.OutDescCopy()
 
 	for _, medi := range desc.Medias {
 		for _, forma := range medi.Formats {
