@@ -266,13 +266,13 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 
 	for _, medi := range desc.Medias {
 		for _, forma := range medi.Formats {
-			if _, ok := forma.(*format.Generic); ok {
+			if _, isGeneric := forma.(*format.Generic); isGeneric {
 				rtpMap := forma.RTPMap()
 				switch {
 				case len(rtpMap) >= 9 && rtpMap[:9] == "OMT-video":
 					r.OnData(medi, forma, func(u *unit.Unit) error {
-						p, ok := u.Payload.(*unit.PayloadOMTVideo)
-						if !ok {
+						videoPayload, isVideoPayload := u.Payload.(*unit.PayloadOMTVideo)
+						if !isVideoPayload {
 							return nil
 						}
 						f := &omt.Frame{
@@ -280,20 +280,20 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 								FrameType: omt.FrameTypeVideo,
 								Timestamp: u.PTS,
 							},
-							VideoHeader: &p.VideoHeader,
-							Data:        p.Data,
-							Metadata:    p.Metadata,
+							VideoHeader: &videoPayload.VideoHeader,
+							Data:        videoPayload.Data,
+							Metadata:    videoPayload.Metadata,
 						}
-						if err := writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout))); err != nil {
-							return err
+						if deadlineErr := writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout))); deadlineErr != nil {
+							return deadlineErr
 						}
 						return writer.WriteFrame(f)
 					})
 
 				case len(rtpMap) >= 9 && rtpMap[:9] == "OMT-audio":
 					r.OnData(medi, forma, func(u *unit.Unit) error {
-						p, ok := u.Payload.(*unit.PayloadOMTAudio)
-						if !ok {
+						audioPayload, isAudioPayload := u.Payload.(*unit.PayloadOMTAudio)
+						if !isAudioPayload {
 							return nil
 						}
 						f := &omt.Frame{
@@ -301,12 +301,12 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 								FrameType: omt.FrameTypeAudio,
 								Timestamp: u.PTS,
 							},
-							AudioHeader: &p.AudioHeader,
-							Data:        p.Data,
-							Metadata:    p.Metadata,
+							AudioHeader: &audioPayload.AudioHeader,
+							Data:        audioPayload.Data,
+							Metadata:    audioPayload.Metadata,
 						}
-						if err := writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout))); err != nil {
-							return err
+						if deadlineErr := writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout))); deadlineErr != nil {
+							return deadlineErr
 						}
 						return writer.WriteFrame(f)
 					})
@@ -329,8 +329,8 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 	defer onUnreadHook()
 
 	// Disable read deadline for the reading side — we only write.
-	if err := c.netConn.SetReadDeadline(time.Time{}); err != nil {
-		return err
+	if deadlineErr := c.netConn.SetReadDeadline(time.Time{}); deadlineErr != nil {
+		return deadlineErr
 	}
 
 	res.Stream.AddReader(r)

@@ -32,11 +32,11 @@ import (
 	"github.com/bluenviron/mediamtx/internal/rlimit"
 	"github.com/bluenviron/mediamtx/internal/servers/hls"
 	"github.com/bluenviron/mediamtx/internal/servers/moq"
+	"github.com/bluenviron/mediamtx/internal/servers/omt"
 	"github.com/bluenviron/mediamtx/internal/servers/rtmp"
 	"github.com/bluenviron/mediamtx/internal/servers/rtsp"
 	"github.com/bluenviron/mediamtx/internal/servers/srt"
 	"github.com/bluenviron/mediamtx/internal/servers/srtla"
-	"github.com/bluenviron/mediamtx/internal/servers/omt"
 	"github.com/bluenviron/mediamtx/internal/servers/webrtc"
 	"github.com/bluenviron/mediamtx/internal/upgrade"
 )
@@ -1084,7 +1084,7 @@ func (p *Core) closeResources(newConf *conf.Conf, calledByAPI bool) {
 		newConf.RunOnDisconnect != p.conf.RunOnDisconnect ||
 		closePathManager ||
 		closeLogger
-		
+
 	closeAPI := newConf == nil ||
 		newConf.API != p.conf.API ||
 		newConf.APIAddress != p.conf.APIAddress ||
@@ -1141,7 +1141,7 @@ func (p *Core) closeResources(newConf *conf.Conf, calledByAPI bool) {
 		p.omtServer.Close()
 		p.omtServer = nil
 	}
-	
+
 	if closeWebRTCServer && p.webRTCServer != nil {
 		p.webRTCServer.Close()
 		p.webRTCServer = nil

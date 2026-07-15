@@ -13,11 +13,11 @@ import (
 	"github.com/bluenviron/mediamtx/internal/logger"
 	sshls "github.com/bluenviron/mediamtx/internal/staticsources/hls"
 	ssmpegts "github.com/bluenviron/mediamtx/internal/staticsources/mpegts"
+	ssomt "github.com/bluenviron/mediamtx/internal/staticsources/omt"
 	ssrpicamera "github.com/bluenviron/mediamtx/internal/staticsources/rpicamera"
 	ssrtmp "github.com/bluenviron/mediamtx/internal/staticsources/rtmp"
 	ssrtp "github.com/bluenviron/mediamtx/internal/staticsources/rtp"
 	ssrtsp "github.com/bluenviron/mediamtx/internal/staticsources/rtsp"
-	ssomt "github.com/bluenviron/mediamtx/internal/staticsources/omt"
 	sssrt "github.com/bluenviron/mediamtx/internal/staticsources/srt"
 	sswebrtc "github.com/bluenviron/mediamtx/internal/staticsources/webrtc"
 )

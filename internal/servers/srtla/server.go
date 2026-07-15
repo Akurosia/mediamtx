@@ -281,12 +281,12 @@ func (s *Server) handleReg1(data []byte, addr *net.UDPAddr) {
 	s.connIndex[addrPort] = g
 	s.mu.Unlock()
 
-	if err := s.sendReg2(addr, fullID); err != nil {
+	if sendErr := s.sendReg2(addr, fullID); sendErr != nil {
 		s.mu.Lock()
 		delete(s.groups, fullID)
 		delete(s.connIndex, addrPort)
 		s.mu.Unlock()
-		s.Log(logger.Warn, "group %s: failed to send REG2 to %s: %v", g.shortID(), addr, err)
+		s.Log(logger.Warn, "group %s: failed to send REG2 to %s: %v", g.shortID(), addr, sendErr)
 		return
 	}
 
@@ -537,16 +537,16 @@ func (s *Server) srtReadLoop(g *group) {
 			}
 			s.mu.Unlock()
 			for _, a := range addrs {
-				if _, err := s.ln.WriteToUDP(pktData, a); err != nil {
-					s.Log(logger.Debug, "group %s: failed to send SRT ACK to %s: %v", g.shortID(), a, err)
+				if _, writeErr := s.ln.WriteToUDP(pktData, a); writeErr != nil {
+					s.Log(logger.Debug, "group %s: failed to send SRT ACK to %s: %v", g.shortID(), a, writeErr)
 				}
 			}
 		} else {
 			dst := g.lastAddr
 			s.mu.Unlock()
 			if dst != nil {
-				if _, err := s.ln.WriteToUDP(pktData, dst); err != nil {
-					s.Log(logger.Debug, "group %s: failed to route SRT packet to %s: %v", g.shortID(), dst, err)
+				if _, writeErr := s.ln.WriteToUDP(pktData, dst); writeErr != nil {
+					s.Log(logger.Debug, "group %s: failed to route SRT packet to %s: %v", g.shortID(), dst, writeErr)
 				}
 			}
 		}

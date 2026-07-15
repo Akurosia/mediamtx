@@ -77,9 +77,9 @@ func (s *Server) Initialize() error {
 		Port:   port,
 		Parent: s,
 	}
-	if err := s.dnsSD.Initialize(); err != nil {
-		s.ln.Close()
-		return err
+	if initializeErr := s.dnsSD.Initialize(); initializeErr != nil {
+		_ = s.ln.Close()
+		return initializeErr
 	}
 
 	s.Log(logger.Info, "listener opened on "+s.Address+" (TCP)")
@@ -110,7 +110,7 @@ func (s *Server) Close() {
 	s.Log(logger.Info, "listener is closing")
 	s.PathManager.SetOMTServer(nil)
 	s.ctxCancel()
-	s.ln.Close()
+	_ = s.ln.Close()
 	s.wg.Wait()
 	s.dnsSD.Close()
 }
@@ -147,7 +147,7 @@ func (s *Server) runAccept() {
 		select {
 		case s.chNewConn <- netConn:
 		case <-s.ctx.Done():
-			netConn.Close()
+			_ = netConn.Close()
 			return
 		}
 	}
