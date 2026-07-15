@@ -414,7 +414,7 @@ type Conf struct {
 	// OMT server
 	OMT        bool   `json:"omt"`
 	OMTAddress string `json:"omtAddress"`
-	
+
 	// Record (deprecated)
 	Record                *bool         `json:"record,omitempty" deprecated:"true"`
 	RecordPath            *string       `json:"recordPath,omitempty" deprecated:"true"`
@@ -558,7 +558,7 @@ func (conf *Conf) setDefaults() {
 	// OMT server
 	conf.OMT = true
 	conf.OMTAddress = ":9800"
-	
+
 	conf.PathDefaults.setDefaults()
 }
 
@@ -1082,7 +1082,7 @@ func (conf *Conf) Validate(l logger.Writer) error {
 			return fmt.Errorf("invalid 'omtAddress': %w", err)
 		}
 	}
-	
+
 	// Record (deprecated)
 
 	if conf.SRTLA {

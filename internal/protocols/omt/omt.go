@@ -15,10 +15,10 @@ const (
 	TimestampFrequency = 10_000_000
 
 	// Default port range.
-	DefaultPort    = 6400
-	MaxPort        = 6600
-	URLScheme      = "omt"
-	DNSSDService   = "_omt._tcp"
+	DefaultPort  = 6400
+	MaxPort      = 6600
+	URLScheme    = "omt"
+	DNSSDService = "_omt._tcp"
 
 	// Socket buffer sizes.
 	SendBufferSize    = 1 << 20 // 1 MB
@@ -91,11 +91,11 @@ type VideoFlags uint32
 
 // Video flag bits.
 const (
-	VideoFlagInterlaced   VideoFlags = 1
-	VideoFlagAlpha        VideoFlags = 2
+	VideoFlagInterlaced    VideoFlags = 1
+	VideoFlagAlpha         VideoFlags = 2
 	VideoFlagPreMultiplied VideoFlags = 4
-	VideoFlagPreview      VideoFlags = 8
-	VideoFlagHighBitDepth VideoFlags = 16
+	VideoFlagPreview       VideoFlags = 8
+	VideoFlagHighBitDepth  VideoFlags = 16
 )
 
 // ColorSpace identifies the color space.

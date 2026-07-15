@@ -130,5 +130,3 @@ func (m *Manager) Close() {
 	}
 	m.registrations = nil
 }
-
-

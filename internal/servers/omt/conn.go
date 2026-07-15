@@ -182,12 +182,12 @@ func (c *conn) runPublish(reader *omt.Reader, firstFrame *omt.Frame) error {
 		default:
 		}
 
-		if err := reader.SetReadDeadline(time.Now().Add(time.Duration(c.readTimeout))); err != nil {
-			return err
+		if deadlineErr := reader.SetReadDeadline(time.Now().Add(time.Duration(c.readTimeout))); deadlineErr != nil {
+			return deadlineErr
 		}
-		frame, err := reader.ReadFrame()
-		if err != nil {
-			return err
+		frame, readErr := reader.ReadFrame()
+		if readErr != nil {
+			return readErr
 		}
 
 		c.processPublishFrame(frame, subStream, medias, videoFormat, audioFormat)
@@ -255,8 +255,8 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 	writer := omt.NewWriter(c.netConn)
 
 	// Send our info.
-	if err := writer.WriteMetadataCommand(omt.XMLInfoTemplate); err != nil {
-		return err
+	if writeErr := writer.WriteMetadataCommand(omt.XMLInfoTemplate); writeErr != nil {
+		return writeErr
 	}
 
 	// Set up stream reader.
@@ -266,8 +266,7 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 
 	for _, medi := range desc.Medias {
 		for _, forma := range medi.Formats {
-			switch forma.(type) {
-			case *format.Generic:
+			if _, ok := forma.(*format.Generic); ok {
 				rtpMap := forma.RTPMap()
 				switch {
 				case len(rtpMap) >= 9 && rtpMap[:9] == "OMT-video":

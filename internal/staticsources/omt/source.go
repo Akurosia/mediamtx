@@ -150,7 +150,9 @@ func (s *Source) readLoop(
 	audioFormat *format.Generic,
 ) error {
 	for {
-		reader.SetReadDeadline(time.Now().Add(time.Duration(s.ReadTimeout)))
+		if err := reader.SetReadDeadline(time.Now().Add(time.Duration(s.ReadTimeout))); err != nil {
+			return err
+		}
 
 		frame, err := reader.ReadFrame()
 		if err != nil {
