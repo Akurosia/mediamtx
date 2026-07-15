@@ -27,7 +27,9 @@ func allocateUDPListener(t *testing.T) *net.UDPConn {
 
 func TestServerRegistration(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -42,7 +44,9 @@ func TestServerRegistration(t *testing.T) {
 	require.NoError(t, err)
 	client, err := net.ListenUDP("udp", clientAddr)
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	srtlaAddr := s.ln.LocalAddr().(*net.UDPAddr)
 
@@ -56,7 +60,7 @@ func TestServerRegistration(t *testing.T) {
 	require.NoError(t, err)
 
 	buf := make([]byte, 512)
-	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err := client.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtlaReg2Len, n)
@@ -79,7 +83,9 @@ func TestServerRegistration(t *testing.T) {
 
 func TestServerDataForwarding(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -94,7 +100,9 @@ func TestServerDataForwarding(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	doRegistration(t, client, srtlaAddr)
 
@@ -107,7 +115,7 @@ func TestServerDataForwarding(t *testing.T) {
 	require.NoError(t, err)
 
 	buf := make([]byte, 256)
-	srtBackend.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, srtBackend.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err := srtBackend.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, 64, n)
@@ -117,7 +125,9 @@ func TestServerDataForwarding(t *testing.T) {
 
 func TestServerResponseRouting(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -132,7 +142,9 @@ func TestServerResponseRouting(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	doRegistration(t, client, srtlaAddr)
 
@@ -142,7 +154,7 @@ func TestServerResponseRouting(t *testing.T) {
 	require.NoError(t, err)
 
 	buf := make([]byte, 256)
-	srtBackend.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, srtBackend.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, fromAddr, err := srtBackend.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtMinPacketSize, n)
@@ -154,7 +166,7 @@ func TestServerResponseRouting(t *testing.T) {
 	_, err = srtBackend.WriteToUDP(responsePkt, fromAddr)
 	require.NoError(t, err)
 
-	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err = client.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtMinPacketSize, n)
@@ -163,7 +175,9 @@ func TestServerResponseRouting(t *testing.T) {
 
 func TestServerACKBroadcast(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -178,13 +192,17 @@ func TestServerACKBroadcast(t *testing.T) {
 
 	client1, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client1.Close()
+	defer func() {
+		require.NoError(t, client1.Close())
+	}()
 
 	fullID := doRegistration(t, client1, srtlaAddr)
 
 	client2, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client2.Close()
+	defer func() {
+		require.NoError(t, client2.Close())
+	}()
 
 	doRegistrationJoin(t, client2, srtlaAddr, fullID)
 
@@ -194,7 +212,7 @@ func TestServerACKBroadcast(t *testing.T) {
 	require.NoError(t, err)
 
 	buf := make([]byte, 256)
-	srtBackend.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, srtBackend.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, fromAddr, err := srtBackend.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtMinPacketSize, n)
@@ -206,13 +224,13 @@ func TestServerACKBroadcast(t *testing.T) {
 	_, err = srtBackend.WriteToUDP(ackPkt, fromAddr)
 	require.NoError(t, err)
 
-	client1.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client1.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err = client1.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtMinPacketSize, n)
 	require.Equal(t, uint16(srtTypeACK), binary.BigEndian.Uint16(buf[:2]))
 
-	client2.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client2.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err = client2.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtMinPacketSize, n)
@@ -221,7 +239,9 @@ func TestServerACKBroadcast(t *testing.T) {
 
 func TestServerSRTLAACKGeneration(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -236,7 +256,9 @@ func TestServerSRTLAACKGeneration(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	doRegistration(t, client, srtlaAddr)
 
@@ -247,7 +269,7 @@ func TestServerSRTLAACKGeneration(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	srtBackend.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	require.NoError(t, srtBackend.SetReadDeadline(time.Now().Add(500*time.Millisecond)))
 	buf := make([]byte, 256)
 	for {
 		_, _, err := srtBackend.ReadFromUDP(buf)
@@ -257,7 +279,7 @@ func TestServerSRTLAACKGeneration(t *testing.T) {
 	}
 
 	// SRTLA ACK format: 4-byte header (type u16 + 2 padding) + 4 bytes per seq number.
-	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err := client.ReadFromUDP(buf)
 	require.NoError(t, err)
 
@@ -273,7 +295,9 @@ func TestServerSRTLAACKGeneration(t *testing.T) {
 
 func TestServerKeepalive(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -288,7 +312,9 @@ func TestServerKeepalive(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	doRegistration(t, client, srtlaAddr)
 
@@ -298,7 +324,7 @@ func TestServerKeepalive(t *testing.T) {
 	require.NoError(t, err)
 
 	buf := make([]byte, 64)
-	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err := client.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, 2, n)
@@ -307,7 +333,9 @@ func TestServerKeepalive(t *testing.T) {
 
 func TestServerReg1OnlyNoBackendSocket(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -322,7 +350,9 @@ func TestServerReg1OnlyNoBackendSocket(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	fullID := doRegistration(t, client, srtlaAddr)
 
@@ -336,7 +366,9 @@ func TestServerReg1OnlyNoBackendSocket(t *testing.T) {
 
 func TestServerDataBeforeReg2Ignored(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -351,25 +383,31 @@ func TestServerDataBeforeReg2Ignored(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	unregisteredClient, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer unregisteredClient.Close()
+	defer func() {
+		require.NoError(t, unregisteredClient.Close())
+	}()
 
 	dataPkt := make([]byte, srtMinPacketSize)
 	binary.BigEndian.PutUint32(dataPkt[:4], 0x00000001)
 	_, err = unregisteredClient.WriteToUDP(dataPkt, srtlaAddr)
 	require.NoError(t, err)
 
-	srtBackend.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	require.NoError(t, srtBackend.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
 	_, _, err = srtBackend.ReadFromUDP(make([]byte, 256))
 	require.Error(t, err, "data from unknown addr must NOT be forwarded to SRT backend")
 }
 
 func TestServerKeepaliveBeforeRegistrationIgnored(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -384,21 +422,25 @@ func TestServerKeepaliveBeforeRegistrationIgnored(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	pkt := make([]byte, 2)
 	binary.BigEndian.PutUint16(pkt[:2], srtlaTypeKeepalive)
 	_, err = client.WriteToUDP(pkt, srtlaAddr)
 	require.NoError(t, err)
 
-	client.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
 	_, _, err = client.ReadFromUDP(make([]byte, 64))
 	require.Error(t, err, "keepalive from unknown addr must NOT get response")
 }
 
 func TestServerClosesClearsState(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -412,7 +454,9 @@ func TestServerClosesClearsState(t *testing.T) {
 
 	client, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
-	defer client.Close()
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
 
 	doRegistration(t, client, srtlaAddr)
 
@@ -431,7 +475,9 @@ func TestServerClosesClearsState(t *testing.T) {
 
 func TestServerSetGroupPathPostClose(t *testing.T) {
 	srtBackend := allocateUDPListener(t)
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	s := &Server{
 		Address:    "127.0.0.1:0",
@@ -455,13 +501,15 @@ func TestServerIPv6LoopbackResolution(t *testing.T) {
 	if err != nil {
 		t.Skip("IPv6 loopback not available")
 	}
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	port := srtBackend.LocalAddr().(*net.UDPAddr).Port
 
 	s := &Server{
 		Address:    "[::1]:0",
-		SRTAddress: "[::]:"+fmt.Sprint(port),
+		SRTAddress: "[::]:" + fmt.Sprint(port),
 		Parent:     &testLogger{},
 	}
 	err = s.Initialize()
@@ -476,13 +524,15 @@ func TestServerHostlessWithIPv6Listener(t *testing.T) {
 	if err != nil {
 		t.Skip("IPv6 loopback not available")
 	}
-	defer srtBackend.Close()
+	defer func() {
+		require.NoError(t, srtBackend.Close())
+	}()
 
 	port := srtBackend.LocalAddr().(*net.UDPAddr).Port
 
 	s := &Server{
 		Address:    "[::1]:0",
-		SRTAddress: ":"+fmt.Sprint(port),
+		SRTAddress: ":" + fmt.Sprint(port),
 		Parent:     &testLogger{},
 	}
 	err = s.Initialize()
@@ -517,7 +567,7 @@ func doRegistration(t *testing.T, client *net.UDPConn, srtlaAddr *net.UDPAddr) [
 	require.NoError(t, err)
 
 	buf := make([]byte, 512)
-	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err := client.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtlaReg2Len, n)
@@ -538,7 +588,7 @@ func doRegistrationJoin(t *testing.T, client *net.UDPConn, srtlaAddr *net.UDPAdd
 	require.NoError(t, err)
 
 	buf := make([]byte, 64)
-	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
 	n, _, err := client.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, srtlaReg3Len, n)
