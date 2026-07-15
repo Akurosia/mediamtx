@@ -48,9 +48,10 @@ func (r *Reader) ReadFrame() (*Frame, error) {
 
 	// Sanity check size.
 	maxSize := MaxVideoSize
-	if f.Header.FrameType == FrameTypeAudio {
+	switch f.Header.FrameType {
+	case FrameTypeAudio:
 		maxSize = MaxAudioSize
-	} else if f.Header.FrameType == FrameTypeMetadata {
+	case FrameTypeMetadata:
 		maxSize = MaxMetadataSize
 	}
 	if dataLen > maxSize {

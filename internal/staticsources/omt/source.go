@@ -56,9 +56,10 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 		return fmt.Errorf("connect to %s: %w", address, err)
 	}
 
-	if err := omt.SetSocketBuffers(conn); err != nil {
-		conn.Close()
-		return fmt.Errorf("set socket buffers: %w", err)
+	bufferErr := omt.SetSocketBuffers(conn)
+	if bufferErr != nil {
+		_ = conn.Close()
+		return fmt.Errorf("set socket buffers: %w", bufferErr)
 	}
 
 	s.Log(logger.Debug, "connected to %s", address)
@@ -71,13 +72,13 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 	for {
 		select {
 		case err = <-readDone:
-			conn.Close()
+			_ = conn.Close()
 			return err
 
 		case <-params.ReloadConf:
 
 		case <-params.Context.Done():
-			conn.Close()
+			_ = conn.Close()
 			<-readDone
 			return nil
 		}

@@ -230,7 +230,7 @@ func (c *conn) processPublishFrame(
 	}
 }
 
-func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error {
+func (c *conn) runRead(_ *omt.Reader, firstMetadataFrame *omt.Frame) error {
 	c.mutex.Lock()
 	c.pathName = defaultPathName
 	c.mutex.Unlock()

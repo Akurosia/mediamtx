@@ -53,7 +53,7 @@ func TestServerRegistration(t *testing.T) {
 	// REG1: type(2) + sender_id(128 bytes, first half of 256-byte ID)
 	reg1 := make([]byte, srtlaReg1Len)
 	binary.BigEndian.PutUint16(reg1[:2], srtlaTypeReg1)
-	for i := 0; i < srtlaIDLen/2; i++ {
+	for i := range srtlaIDLen / 2 {
 		reg1[2+i] = byte(i)
 	}
 	_, err = client.WriteToUDP(reg1, srtlaAddr)
@@ -69,7 +69,7 @@ func TestServerRegistration(t *testing.T) {
 	var fullID [srtlaIDLen]byte
 	copy(fullID[:], buf[2:2+srtlaIDLen])
 
-	for i := 0; i < srtlaIDLen/2; i++ {
+	for i := range srtlaIDLen / 2 {
 		require.Equal(t, byte(i), fullID[i], "sender_id byte %d mismatch", i)
 	}
 
@@ -262,7 +262,7 @@ func TestServerSRTLAACKGeneration(t *testing.T) {
 
 	doRegistration(t, client, srtlaAddr)
 
-	for i := 0; i < recvACKInterval; i++ {
+	for i := range recvACKInterval {
 		pkt := make([]byte, srtMinPacketSize)
 		binary.BigEndian.PutUint32(pkt[:4], uint32(100+i))
 		_, err = client.WriteToUDP(pkt, srtlaAddr)
@@ -272,8 +272,8 @@ func TestServerSRTLAACKGeneration(t *testing.T) {
 	require.NoError(t, srtBackend.SetReadDeadline(time.Now().Add(500*time.Millisecond)))
 	buf := make([]byte, 256)
 	for {
-		_, _, err := srtBackend.ReadFromUDP(buf)
-		if err != nil {
+		_, _, readErr := srtBackend.ReadFromUDP(buf)
+		if readErr != nil {
 			break
 		}
 	}
@@ -287,7 +287,7 @@ func TestServerSRTLAACKGeneration(t *testing.T) {
 	require.Equal(t, expectedLen, n)
 	require.Equal(t, uint16(srtlaTypeACK), binary.BigEndian.Uint16(buf[:2]))
 
-	for i := 0; i < recvACKInterval; i++ {
+	for i := range recvACKInterval {
 		seq := binary.BigEndian.Uint32(buf[4+4*i:])
 		require.Equal(t, uint32(100+i), seq, "seq[%d]", i)
 	}
@@ -560,7 +560,7 @@ func doRegistration(t *testing.T, client *net.UDPConn, srtlaAddr *net.UDPAddr) [
 
 	reg1 := make([]byte, srtlaReg1Len)
 	binary.BigEndian.PutUint16(reg1[:2], srtlaTypeReg1)
-	for i := 0; i < srtlaIDLen/2; i++ {
+	for i := range srtlaIDLen / 2 {
 		reg1[2+i] = byte(i)
 	}
 	_, err := client.WriteToUDP(reg1, srtlaAddr)

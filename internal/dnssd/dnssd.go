@@ -1,3 +1,4 @@
+// Package dnssd provides DNS-SD service registration.
 package dnssd
 
 import (
