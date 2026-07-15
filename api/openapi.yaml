@@ -233,6 +233,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AuthInternalUserPermission"
+        streamkey:
+          type: string
         user:
           type: string
 
