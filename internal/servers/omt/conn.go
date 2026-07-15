@@ -90,7 +90,7 @@ func (c *conn) run() {
 	err := c.runInner()
 
 	c.ctxCancel()
-	c.netConn.Close()
+	_ = c.netConn.Close()
 	c.parent.closeConn(c)
 
 	c.Log(logger.Info, "closed: %v", err)
@@ -101,7 +101,9 @@ func (c *conn) runInner() error {
 	// If it's a metadata frame with subscription commands, the remote is a reader.
 	// If it's a video/audio frame, the remote is a publisher.
 	reader := omt.NewReader(c.netConn)
-	reader.SetReadDeadline(time.Now().Add(time.Duration(c.readTimeout)))
+	if err := reader.SetReadDeadline(time.Now().Add(time.Duration(c.readTimeout))); err != nil {
+		return err
+	}
 
 	frame, err := reader.ReadFrame()
 	if err != nil {
@@ -151,12 +153,12 @@ func (c *conn) runPublish(reader *omt.Reader, firstFrame *omt.Frame) error {
 		UseRTPPackets: false,
 		ReplaceNTP:    true,
 		AccessRequest: defs.PathAccessRequest{
-			Name:    c.pathName,
-			Publish: true,
-			Proto:   auth.ProtocolOMT,
-			ID:      &c.uuid,
+			Name:        c.pathName,
+			Publish:     true,
+			Proto:       auth.ProtocolOMT,
+			ID:          &c.uuid,
 			Credentials: &auth.Credentials{},
-			IP:      c.ip(),
+			IP:          c.ip(),
 		},
 	})
 	if err != nil {
@@ -180,7 +182,9 @@ func (c *conn) runPublish(reader *omt.Reader, firstFrame *omt.Frame) error {
 		default:
 		}
 
-		reader.SetReadDeadline(time.Now().Add(time.Duration(c.readTimeout)))
+		if err := reader.SetReadDeadline(time.Now().Add(time.Duration(c.readTimeout))); err != nil {
+			return err
+		}
 		frame, err := reader.ReadFrame()
 		if err != nil {
 			return err
@@ -281,7 +285,9 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 							Data:        p.Data,
 							Metadata:    p.Metadata,
 						}
-						writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout)))
+						if err := writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout))); err != nil {
+							return err
+						}
 						return writer.WriteFrame(f)
 					})
 
@@ -300,7 +306,9 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 							Data:        p.Data,
 							Metadata:    p.Metadata,
 						}
-						writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout)))
+						if err := writer.SetWriteDeadline(time.Now().Add(time.Duration(c.writeTimeout))); err != nil {
+							return err
+						}
 						return writer.WriteFrame(f)
 					})
 				}
@@ -322,7 +330,9 @@ func (c *conn) runRead(reader *omt.Reader, firstMetadataFrame *omt.Frame) error 
 	defer onUnreadHook()
 
 	// Disable read deadline for the reading side — we only write.
-	c.netConn.SetReadDeadline(time.Time{})
+	if err := c.netConn.SetReadDeadline(time.Time{}); err != nil {
+		return err
+	}
 
 	res.Stream.AddReader(r)
 	defer res.Stream.RemoveReader(r)

@@ -55,8 +55,8 @@ type connEntry struct {
 type group struct {
 	id             [srtlaIDLen]byte
 	conns          []*connEntry
-	srtConn    *net.UDPConn
-	srtAddrKey string
+	srtConn        *net.UDPConn
+	srtAddrKey     string
 	lastSeen       time.Time
 	lastAddr       *net.UDPAddr
 	path           string
@@ -94,7 +94,7 @@ type Server struct {
 	Parent     serverParent
 
 	ln           *net.UDPConn
-	srtAddrPort netip.AddrPort
+	srtAddrPort  netip.AddrPort
 	wg           sync.WaitGroup
 	done         chan struct{}
 	mu           sync.Mutex
@@ -119,7 +119,7 @@ func (s *Server) Initialize() error {
 	// Pre-resolve SRT target address.
 	srtAddr, err := net.ResolveUDPAddr("udp", s.SRTAddress)
 	if err != nil {
-		s.ln.Close()
+		_ = s.ln.Close()
 		return err
 	}
 	if srtAddr.IP == nil || srtAddr.IP.IsUnspecified() {
@@ -165,13 +165,13 @@ func (s *Server) Close() {
 	}
 
 	close(s.done)
-	s.ln.Close()
+	_ = s.ln.Close()
 
 	s.mu.Lock()
 	s.closed = true
 	for _, g := range s.groups {
 		if g.srtConn != nil {
-			g.srtConn.Close()
+			_ = g.srtConn.Close()
 		}
 	}
 	// Clear all maps so post-close method calls are true no-ops.
@@ -477,13 +477,13 @@ func (s *Server) createSRTConn(g *group) (*net.UDPConn, error) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		srtConn.Close()
+		_ = srtConn.Close()
 		return nil, net.ErrClosed
 	}
 	// Double-check: another goroutine may have created it concurrently.
 	if g.srtConn != nil {
 		s.mu.Unlock()
-		srtConn.Close()
+		_ = srtConn.Close()
 		return g.srtConn, nil
 	}
 	g.srtConn = srtConn
@@ -582,7 +582,7 @@ func (s *Server) cleanup() {
 			}
 			if g.srtConn != nil {
 				delete(s.srtAddrIndex, g.srtAddrKey)
-				g.srtConn.Close()
+				_ = g.srtConn.Close()
 			}
 			delete(s.groups, id)
 			s.Log(logger.Debug, "group %s: timed out (path: %s)", g.shortID(), g.path)
@@ -617,7 +617,7 @@ func (s *Server) cleanup() {
 		if len(g.conns) == 0 {
 			if g.srtConn != nil {
 				delete(s.srtAddrIndex, g.srtAddrKey)
-				g.srtConn.Close()
+				_ = g.srtConn.Close()
 			}
 			delete(s.groups, id)
 			s.Log(logger.Debug, "group %s: removed, no connections remaining (path: %s)", g.shortID(), g.path)
@@ -658,7 +658,7 @@ func (s *Server) CloseGroupByAddr(srtConnAddr string) {
 	delete(s.srtAddrIndex, key)
 	delete(s.groups, g.id)
 	if g.srtConn != nil {
-		g.srtConn.Close()
+		_ = g.srtConn.Close()
 	}
 
 	s.Log(logger.Debug, "group %s: closed by SRT (path: %s)", g.shortID(), g.path)
