@@ -161,13 +161,15 @@ func (m *Manager) authenticateInternal(req *Request) (string, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
+	streamKey := getStreamKey(req)
+
 	for _, u := range m.InternalUsers {
 		if ok := m.authenticateWithUser(req, &u); ok {
-			if u.User == "any" {
-				return req.Credentials.User, nil
+			if streamKey != "" && u.StreamKey != "" {
+				return string(u.User), nil
 			}
 
-			return string(u.User), nil
+			return req.Credentials.User, nil
 		}
 	}
 
@@ -188,18 +190,15 @@ func (m *Manager) authenticateWithUser(
 
 	if u.User != "any" {
 		streamKey := getStreamKey(req)
-		switch {
-		case streamKey != "" && u.StreamKey != "":
+		if streamKey != "" && u.StreamKey != "" {
 			if !u.StreamKey.Check(streamKey) {
 				return false
 			}
-
-		case req.CustomVerifyFunc != nil:
+		} else if req.CustomVerifyFunc != nil {
 			if ok := req.CustomVerifyFunc(string(u.User), string(u.Pass)); !ok {
 				return false
 			}
-
-		default:
+		} else {
 			if !u.User.Check(req.Credentials.User) || !u.Pass.Check(req.Credentials.Pass) {
 				return false
 			}
