@@ -165,11 +165,16 @@ func (m *Manager) authenticateInternal(req *Request) (string, error) {
 
 	for _, u := range m.InternalUsers {
 		if ok := m.authenticateWithUser(req, &u); ok {
-			if streamKey != "" && u.StreamKey != "" {
-				return string(u.User), nil
-			}
+			switch {
+			case u.User == "any":
+				return req.Credentials.User, nil
 
-			return req.Credentials.User, nil
+			case streamKey != "" && u.StreamKey != "":
+				return string(u.User), nil
+
+			default:
+				return req.Credentials.User, nil
+			}
 		}
 	}
 
@@ -190,15 +195,18 @@ func (m *Manager) authenticateWithUser(
 
 	if u.User != "any" {
 		streamKey := getStreamKey(req)
-		if streamKey != "" && u.StreamKey != "" {
+		switch {
+		case streamKey != "" && u.StreamKey != "":
 			if !u.StreamKey.Check(streamKey) {
 				return false
 			}
-		} else if req.CustomVerifyFunc != nil {
+
+		case req.CustomVerifyFunc != nil:
 			if ok := req.CustomVerifyFunc(string(u.User), string(u.Pass)); !ok {
 				return false
 			}
-		} else {
+
+		default:
 			if !u.User.Check(req.Credentials.User) || !u.Pass.Check(req.Credentials.Pass) {
 				return false
 			}
