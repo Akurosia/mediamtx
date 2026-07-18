@@ -1139,6 +1139,10 @@ components:
           items:
             type: integer
             format: uint64
+        runOnAvailable:
+          type: string
+        runOnAvailableRestart:
+          type: boolean
         runOnDemand:
           type: string
         runOnDemandCloseAfter:
@@ -1154,19 +1158,33 @@ components:
           type: boolean
         runOnNotReady:
           type: string
+          nullable: true
+          deprecated: true
+        runOnOffline:
+          type: string
+        runOnOnline:
+          type: string
+        runOnOnlineRestart:
+          type: boolean
         runOnRead:
           type: string
         runOnReadRestart:
           type: boolean
         runOnReady:
           type: string
+          nullable: true
+          deprecated: true
         runOnReadyRestart:
           type: boolean
+          nullable: true
+          deprecated: true
         runOnRecordSegmentComplete:
           type: string
         runOnRecordSegmentCreate:
           type: string
         runOnUnDemand:
+          type: string
+        runOnUnavailable:
           type: string
         runOnUnread:
           type: string
