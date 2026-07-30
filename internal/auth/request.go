@@ -23,13 +23,14 @@ const (
 
 // Request is an authentication request.
 type Request struct {
-	Action           conf.AuthAction
-	Path             string // only for ActionPublish, ActionRead, ActionPlayback
-	Query            string
-	Protocol         Protocol   // only for ActionPublish, ActionRead
-	ID               *uuid.UUID // only for ActionPublish, ActionRead
-	UserAgent        string
-	Credentials      *Credentials
-	IP               net.IP
-	CustomVerifyFunc func(expectedUser string, expectedPass string) bool
+	Action               conf.AuthAction
+	Path                 string // only for ActionPublish, ActionRead, ActionPlayback
+	Query                string
+	Protocol             Protocol   // only for ActionPublish, ActionRead
+	ID                   *uuid.UUID // only for ActionPublish, ActionRead
+	UserAgent            string
+	Credentials          *Credentials
+	IP                   net.IP
+	CustomVerifyFunc     func(expectedUser string, expectedPass string) bool
+	EnableAskCredentials bool
 }
