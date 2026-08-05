@@ -151,12 +151,11 @@ func (m *Manager) Authenticate(req *Request) (string, *Error) {
 	if err != nil {
 		return "", &Error{
 			Wrapped:        err,
-			AskCredentials: req.EnableAskCredentials && (
-				req.Credentials.User == "" &&
+			AskCredentials: req.EnableAskCredentials &&
+				(req.Credentials.User == "" &&
 					req.Credentials.Pass == "" &&
 					getStreamKey(req) == "" &&
-					token == ""
-			),
+					token == ""),
 		}
 	}
 
