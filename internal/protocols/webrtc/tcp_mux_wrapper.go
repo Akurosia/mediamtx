@@ -7,7 +7,9 @@ import (
 )
 
 // TCPMuxWrapper is a wrapper around ice.TCPMux.
+
 type TCPMuxWrapper struct {
 	Mux ice.TCPMux
-	Ln  net.Listener
+
+	Ln net.Listener
 }

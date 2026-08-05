@@ -8,31 +8,47 @@ import (
 
 type inboundTrack struct {
 	onSubGroup func(sg *subgroup.SubGroup) error
-	parent     logger.Writer
+
+	parent logger.Writer
 
 	reorderer *reorderer.Reorderer
 }
 
 func (t *inboundTrack) initialize() {
+
 	t.reorderer = &reorderer.Reorderer{
+
 		MaxReordered: maxReorderedSubGroups,
-		Parent:       t.parent,
+
+		Parent: t.parent,
 	}
+
 	t.reorderer.Initialize()
+
 }
 
 func (t *inboundTrack) push(sg *subgroup.SubGroup) error {
+
 	sgs, err := t.reorderer.Push(sg)
+
 	if err != nil {
+
 		return err
+
 	}
 
 	for _, s := range sgs {
+
 		err = t.onSubGroup(s)
+
 		if err != nil {
+
 			return err
+
 		}
+
 	}
 
 	return nil
+
 }

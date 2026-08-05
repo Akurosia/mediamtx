@@ -14,11 +14,10 @@ import (
 	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/protocols/tls"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 const (
@@ -150,7 +149,7 @@ func (m *Manager) Authenticate(req *Request) (string, *Error) {
 
 	if err != nil {
 		return "", &Error{
-			Wrapped:        err,
+			Wrapped: err,
 			AskCredentials: req.EnableAskCredentials &&
 				(req.Credentials.User == "" &&
 					req.Credentials.Pass == "" &&

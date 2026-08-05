@@ -15,11 +15,18 @@ type rtpFormat struct {
 }
 
 func (f *rtpFormat) initialize() {
+
 	f.rtpReceiver = &rtpreceiver.Receiver{
-		ClockRate:            f.desc.ClockRate(),
+
+		ClockRate: f.desc.ClockRate(),
+
 		UnrealiableTransport: true,
-		Period:               10 * time.Second,
+
+		Period: 10 * time.Second,
+
 		WritePacketRTCP: func(_ rtcp.Packet) {
+
 		},
 	}
+
 }

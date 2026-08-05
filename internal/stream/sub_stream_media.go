@@ -6,30 +6,44 @@ import (
 )
 
 type subStreamMedia struct {
-	inMedia       *description.Media
-	streamMedia   *streamMedia
+	inMedia *description.Media
+
+	streamMedia *streamMedia
+
 	useRTPPackets bool
 
 	formats map[format.Format]*subStreamFormat
 }
 
 func (ssm *subStreamMedia) initialize() error {
+
 	ssm.formats = make(map[format.Format]*subStreamFormat)
 
 	for i, inFormat := range ssm.inMedia.Formats {
+
 		origFormat := ssm.streamMedia.origMedia.Formats[i]
 
 		ssf := &subStreamFormat{
-			inFormat:      inFormat,
-			streamFormat:  ssm.streamMedia.formats[origFormat],
+
+			inFormat: inFormat,
+
+			streamFormat: ssm.streamMedia.formats[origFormat],
+
 			useRTPPackets: ssm.useRTPPackets,
 		}
+
 		err := ssf.initialize()
+
 		if err != nil {
+
 			return err
+
 		}
+
 		ssm.formats[inFormat] = ssf
+
 	}
 
 	return nil
+
 }

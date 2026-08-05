@@ -10,8 +10,6 @@ import (
 
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
-	"github.com/google/uuid"
-
 	"github.com/bluenviron/mediamtx/internal/auth"
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
@@ -21,6 +19,7 @@ import (
 	"github.com/bluenviron/mediamtx/internal/protocols/omt"
 	"github.com/bluenviron/mediamtx/internal/stream"
 	"github.com/bluenviron/mediamtx/internal/unit"
+	"github.com/google/uuid"
 )
 
 // defaultPathName is used when the OMT connection doesn't specify a path.

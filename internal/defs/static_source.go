@@ -7,9 +7,13 @@ import (
 )
 
 // StaticSourceRunParams is the set of params passed to Run().
+
 type StaticSourceRunParams struct {
-	Context        context.Context
+	Context context.Context
+
 	ResolvedSource string
-	Conf           *conf.Path
-	ReloadConf     chan *conf.Path
+
+	Conf *conf.Path
+
+	ReloadConf chan *conf.Path
 }

@@ -11,9 +11,13 @@ type responseWriterNoCache struct {
 }
 
 func (w *responseWriterNoCache) WriteHeader(statusCode int) {
+
 	if statusCode == http.StatusOK {
+
 		w.ResponseWriter.Header().Set("Cache-Control", "private, no-cache")
+
 	}
 
 	w.ResponseWriter.WriteHeader(statusCode)
+
 }
