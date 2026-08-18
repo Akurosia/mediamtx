@@ -21,6 +21,12 @@ var errNoSupportedCodecs = errors.New(
 	"the stream doesn't contain any supported codec, which are currently " +
 		"H265, H264, MPEG-4 Video, MPEG-1/2 Video, Opus, MPEG-4 Audio, MPEG-1/2 Audio, AC-3")
 
+// TimingDiagnostics receives raw MPEG-TS timing values before they are rebased.
+// Implementations must sample calls since this is invoked for every access unit.
+type TimingDiagnostics interface {
+	LogMPEGTSTiming(track int, pid uint16, kind string, pts int64, dts int64, au [][]byte)
+}
+
 // ToStream maps a MPEG-TS stream to a MediaMTX stream.
 func ToStream(
 	r *EnhancedReader,
@@ -29,6 +35,7 @@ func ToStream(
 ) ([]*description.Media, error) {
 	var medias []*description.Media //nolint:prealloc
 	var unsupportedTracks []int
+	diagnostics, _ := l.(TimingDiagnostics)
 
 	td := &mpegts.TimeDecoder{}
 	td.Initialize()
@@ -45,7 +52,10 @@ func ToStream(
 				}},
 			}
 
-			r.OnDataH265(track, func(pts int64, _ int64, au [][]byte) error {
+			r.OnDataH265(track, func(pts int64, dts int64, au [][]byte) error {
+				if diagnostics != nil {
+					diagnostics.LogMPEGTSTiming(i, track.PID, "H265", pts, dts, au)
+				}
 				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
@@ -64,7 +74,10 @@ func ToStream(
 				}},
 			}
 
-			r.OnDataH264(track, func(pts int64, _ int64, au [][]byte) error {
+			r.OnDataH264(track, func(pts int64, dts int64, au [][]byte) error {
+				if diagnostics != nil {
+					diagnostics.LogMPEGTSTiming(i, track.PID, "H264", pts, dts, au)
+				}
 				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
@@ -118,6 +131,9 @@ func ToStream(
 			}
 
 			r.OnDataOpus(track, func(pts int64, packets [][]byte) error {
+				if diagnostics != nil {
+					diagnostics.LogMPEGTSTiming(i, track.PID, "Opus", pts, pts, nil)
+				}
 				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
@@ -157,6 +173,9 @@ func ToStream(
 			}
 
 			r.OnDataMPEG4Audio(track, func(pts int64, aus [][]byte) error {
+				if diagnostics != nil {
+					diagnostics.LogMPEGTSTiming(i, track.PID, "MPEG4Audio", pts, pts, nil)
+				}
 				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
@@ -184,6 +203,9 @@ func ToStream(
 			clockRate := medi.Formats[0].ClockRate()
 
 			r.OnDataMPEG4AudioLATM(track, func(pts int64, els [][]byte) error {
+				if diagnostics != nil {
+					diagnostics.LogMPEGTSTiming(i, track.PID, "MPEG4AudioLATM", pts, pts, nil)
+				}
 				pts = td.Decode(pts)
 
 				pts = multiplyAndDivide(pts, int64(clockRate), 90000)
