@@ -10,16 +10,17 @@ import (
 
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
-	"github.com/bluenviron/mediamtx/internal/auth"
-	"github.com/bluenviron/mediamtx/internal/conf"
-	"github.com/bluenviron/mediamtx/internal/defs"
-	"github.com/bluenviron/mediamtx/internal/externalcmd"
-	"github.com/bluenviron/mediamtx/internal/hooks"
-	"github.com/bluenviron/mediamtx/internal/logger"
-	"github.com/bluenviron/mediamtx/internal/protocols/omt"
-	"github.com/bluenviron/mediamtx/internal/stream"
-	"github.com/bluenviron/mediamtx/internal/unit"
 	"github.com/google/uuid"
+
+	"github.com/akurosia/mediamtx/internal/auth"
+	"github.com/akurosia/mediamtx/internal/conf"
+	"github.com/akurosia/mediamtx/internal/defs"
+	"github.com/akurosia/mediamtx/internal/externalcmd"
+	"github.com/akurosia/mediamtx/internal/hooks"
+	"github.com/akurosia/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/protocols/omt"
+	"github.com/akurosia/mediamtx/internal/stream"
+	"github.com/akurosia/mediamtx/internal/unit"
 )
 
 // defaultPathName is used when the OMT connection doesn't specify a path.

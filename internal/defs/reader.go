@@ -1,6 +1,6 @@
 package defs
 
-import "github.com/bluenviron/mediamtx/internal/logger"
+import "github.com/akurosia/mediamtx/internal/logger"
 
 // Reader is an entity that can read a stream.
 type Reader interface {

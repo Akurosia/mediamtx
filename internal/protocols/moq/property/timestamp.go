@@ -1,6 +1,6 @@
 package property
 
-import "github.com/bluenviron/mediamtx/internal/protocols/moq/varint"
+import "github.com/akurosia/mediamtx/internal/protocols/moq/varint"
 
 const timestampPropertyType = 0x06
 

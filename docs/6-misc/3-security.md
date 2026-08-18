@@ -2,9 +2,9 @@
 
 ## Security of released binaries
 
-Binaries published in the [Releases](https://github.com/bluenviron/mediamtx/releases) section of GitHub are the output of a building process that is fully visible, prevents hidden changes or external interferences in published artifacts, and allows validation by third parties:
+Binaries published in the [Releases](https://github.com/akurosia/mediamtx/releases) section of GitHub are the output of a building process that is fully visible, prevents hidden changes or external interferences in published artifacts, and allows validation by third parties:
 
-1. During every release, the [Release workflow](https://github.com/bluenviron/mediamtx/actions/workflows/release.yml) is triggered on GitHub.
+1. During every release, the [Release workflow](https://github.com/akurosia/mediamtx/actions/workflows/release.yml) is triggered on GitHub.
 
 2. The release workflow pulls the source code and builds binaries.
 
@@ -28,4 +28,4 @@ cat checksums.sha256 | grep "$(ls mediamtx_*)" | sha256sum --check
 
 ## Reporting vulnerabilities
 
-Vulnerabilities can be reported privately by using the [Security Advisory](https://github.com/bluenviron/mediamtx/security/advisories/new) feature of GitHub.
+Vulnerabilities can be reported privately by using the [Security Advisory](https://github.com/akurosia/mediamtx/security/advisories/new) feature of GitHub.

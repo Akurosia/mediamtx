@@ -1,6 +1,6 @@
 package controlmessage
 
-import "github.com/bluenviron/mediamtx/internal/protocols/moq/varint"
+import "github.com/akurosia/mediamtx/internal/protocols/moq/varint"
 
 const typeServerSetup varint.Varint = 0x21
 

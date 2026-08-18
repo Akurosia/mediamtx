@@ -31,8 +31,8 @@ Showing nodes accounting for 5145.10kB, 100% of 5145.10kB total
   512.02kB  9.95% 90.05%   512.02kB  9.95%  crypto/tls.init
   512.02kB  9.95%   100%   512.02kB  9.95%  internal/abi.NewName
          0     0%   100%   512.75kB  9.97%  github.com/bluenviron/gortsplib/v4.(*serverUDPListener).run
-         0     0%   100%   512.02kB  9.95%  github.com/bluenviron/mediamtx/internal/conf.init
-         0     0%   100%   512.02kB  9.95%  github.com/bluenviron/mediamtx/internal/conf.init.func2 (inline)
+         0     0%   100%   512.02kB  9.95%  github.com/akurosia/mediamtx/internal/conf.init
+         0     0%   100%   512.02kB  9.95%  github.com/akurosia/mediamtx/internal/conf.init.func2 (inline)
          0     0%   100%  1044.08kB 20.29%  github.com/go-playground/validator/v10.init
          0     0%   100%   512.02kB  9.95%  reflect.StructOf
          0     0%   100%   512.02kB  9.95%  reflect.newName (inline)
@@ -82,10 +82,10 @@ Showing nodes accounting for 70ms, 100% of 70ms total
          0     0%   100%       10ms 14.29%  github.com/bluenviron/gortsplib/v4.(*serverSessionMedia).readPacketRTPUDPRecord
          0     0%   100%       50ms 71.43%  github.com/bluenviron/gortsplib/v4.(*serverUDPListener).run
          0     0%   100%       10ms 14.29%  github.com/bluenviron/gortsplib/v4.(*serverUDPListener).run.func2
-         0     0%   100%       10ms 14.29%  github.com/bluenviron/mediamtx/internal/protocols/rtsp.ToStream.func2
-         0     0%   100%       10ms 14.29%  github.com/bluenviron/mediamtx/internal/stream.(*Stream).WriteRTPPacket
-         0     0%   100%       10ms 14.29%  github.com/bluenviron/mediamtx/internal/stream.(*streamFormat).writeRTPPacket
-         0     0%   100%       10ms 14.29%  github.com/bluenviron/mediamtx/internal/stream.(*streamFormat).writeUnitInner
+         0     0%   100%       10ms 14.29%  github.com/akurosia/mediamtx/internal/protocols/rtsp.ToStream.func2
+         0     0%   100%       10ms 14.29%  github.com/akurosia/mediamtx/internal/stream.(*Stream).WriteRTPPacket
+         0     0%   100%       10ms 14.29%  github.com/akurosia/mediamtx/internal/stream.(*streamFormat).writeRTPPacket
+         0     0%   100%       10ms 14.29%  github.com/akurosia/mediamtx/internal/stream.(*streamFormat).writeUnitInner
          0     0%   100%       30ms 42.86%  internal/poll.(*FD).ReadFromInet6
          0     0%   100%       10ms 14.29%  internal/runtime/syscall.EpollWait
          0     0%   100%       40ms 57.14%  net.(*UDPConn).ReadFrom
@@ -139,25 +139,25 @@ Showing nodes accounting for 27, 100% of 27 total
          0     0%   100%          1  3.70%  github.com/bluenviron/gortsplib/v4.(*Server).runInner
          0     0%   100%          1  3.70%  github.com/bluenviron/gortsplib/v4.(*serverTCPListener).run
          0     0%   100%          2  7.41%  github.com/bluenviron/gortsplib/v4.(*serverUDPListener).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/confwatcher.(*ConfWatcher).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/core.(*Core).Wait (inline)
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/core.(*Core).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/core.(*pathManager).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/protocols/httpp.(*handlerExitOnPanic).ServeHTTP
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/protocols/httpp.(*handlerFilterRequests).ServeHTTP
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/protocols/httpp.(*handlerLogger).ServeHTTP
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/protocols/httpp.(*handlerServerHeader).ServeHTTP
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/recordcleaner.(*Cleaner).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/hls.(*Server).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/rtmp.(*Server).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/rtmp.(*listener).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/rtmp.(*listener).runInner
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/rtsp.(*Server).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/rtsp.(*Server).run.func1
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/srt.(*Server).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/srt.(*listener).run
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/srt.(*listener).runInner
-         0     0%   100%          1  3.70%  github.com/bluenviron/mediamtx/internal/servers/webrtc.(*Server).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/confwatcher.(*ConfWatcher).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/core.(*Core).Wait (inline)
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/core.(*Core).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/core.(*pathManager).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/protocols/httpp.(*handlerExitOnPanic).ServeHTTP
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/protocols/httpp.(*handlerFilterRequests).ServeHTTP
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/protocols/httpp.(*handlerLogger).ServeHTTP
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/protocols/httpp.(*handlerServerHeader).ServeHTTP
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/recordcleaner.(*Cleaner).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/hls.(*Server).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/rtmp.(*Server).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/rtmp.(*listener).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/rtmp.(*listener).runInner
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/rtsp.(*Server).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/rtsp.(*Server).run.func1
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/srt.(*Server).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/srt.(*listener).run
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/srt.(*listener).runInner
+         0     0%   100%          1  3.70%  github.com/akurosia/mediamtx/internal/servers/webrtc.(*Server).run
          0     0%   100%          1  3.70%  github.com/datarhei/gosrt.(*listener).Accept2
          0     0%   100%          1  3.70%  github.com/datarhei/gosrt.(*listener).reader
          0     0%   100%          1  3.70%  github.com/datarhei/gosrt.Listen.func1

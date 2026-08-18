@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/bluenviron/mediamtx/internal/conf"
-	"github.com/bluenviron/mediamtx/internal/defs"
-	"github.com/bluenviron/mediamtx/internal/dnssd"
-	"github.com/bluenviron/mediamtx/internal/externalcmd"
-	"github.com/bluenviron/mediamtx/internal/logger"
-	"github.com/bluenviron/mediamtx/internal/protocols/omt"
+	"github.com/akurosia/mediamtx/internal/conf"
+	"github.com/akurosia/mediamtx/internal/defs"
+	"github.com/akurosia/mediamtx/internal/dnssd"
+	"github.com/akurosia/mediamtx/internal/externalcmd"
+	"github.com/akurosia/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/protocols/omt"
 )
 
 type serverPathManager interface {

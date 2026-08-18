@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bluenviron/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/logger"
 )
 
 const (

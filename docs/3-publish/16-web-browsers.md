@@ -28,10 +28,12 @@ http://localhost:8889/mystream/publish
 
 The resulting stream will be available on path `/mystream`.
 
+Be aware that not all browsers can publish tracks with any codec, check [Codec support in browsers](../2-features/25-webrtc-specific-features.md#codec-support-in-browsers).
+
 This web page can be embedded into another web page by using an iframe:
 
 ```html
 <iframe src="http://mediamtx-ip:8889/mystream/publish" scrolling="no"></iframe>
 ```
 
-For more advanced setups, you can create and serve a custom web page by starting from the [source code of the WebRTC publish page](https://github.com/bluenviron/mediamtx/blob/{version_tag}/internal/servers/webrtc/publish_index.html). In particular, there's a ready-to-use, standalone JavaScript class for publishing streams with WebRTC, available in [publisher.js](https://github.com/bluenviron/mediamtx/blob/{version_tag}/internal/servers/webrtc/publisher.js).
+For more advanced setups, you can create and serve a custom web page by starting from the [source code of the WebRTC publish page](https://github.com/akurosia/mediamtx/blob/{version_tag}/internal/servers/webrtc/publish_index.html). In particular, there's a ready-to-use, standalone JavaScript class for publishing streams with WebRTC, available in [publisher.js](https://github.com/akurosia/mediamtx/blob/{version_tag}/internal/servers/webrtc/publisher.js).

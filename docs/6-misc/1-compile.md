@@ -7,7 +7,7 @@
 2. Clone the repository, enter into the folder and start the building process:
 
    ```sh
-   git clone https://github.com/bluenviron/mediamtx
+   git clone https://github.com/akurosia/mediamtx
    cd mediamtx
    go generate ./...
    CGO_ENABLED=0 go build .
@@ -19,14 +19,14 @@
 
 If you need to use a custom or external libcamera to interact with some Raspberry Pi Camera models that require it, additional steps are required:
 
-1. Download [mediamtx-rpicamera source code](https://github.com/bluenviron/mediamtx-rpicamera) and compile it against the external libcamera. Instructions are in the repository.
+1. Download [mediamtx-rpicamera source code](https://github.com/akurosia/mediamtx-rpicamera) and compile it against the external libcamera. Instructions are in the repository.
 
 2. Install git and Go &ge; 1.26.
 
 3. Clone the _MediaMTX_ repository:
 
    ```sh
-   git clone https://github.com/bluenviron/mediamtx
+   git clone https://github.com/akurosia/mediamtx
    ```
 
 4. Inside the _MediaMTX_ folder, run:
@@ -54,7 +54,7 @@ Cross compilation allows to build an executable for a target machine from anothe
 2. Clone the repository, enter into the folder and start the building process:
 
    ```sh
-   git clone https://github.com/bluenviron/mediamtx
+   git clone https://github.com/akurosia/mediamtx
    cd mediamtx
    go generate ./...
    CGO_ENABLED=0 GOOS=my_os GOARCH=my_arch go build .

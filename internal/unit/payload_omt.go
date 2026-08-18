@@ -1,6 +1,6 @@
 package unit
 
-import "github.com/bluenviron/mediamtx/internal/protocols/omt"
+import "github.com/akurosia/mediamtx/internal/protocols/omt"
 
 // PayloadOMTVideo is an OMT video frame payload.
 type PayloadOMTVideo struct {

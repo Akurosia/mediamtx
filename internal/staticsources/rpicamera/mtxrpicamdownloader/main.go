@@ -1,5 +1,4 @@
 // Package main contains an utility to download hls.js
-
 package main
 
 import (
@@ -14,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -21,182 +21,137 @@ const (
 	maxInboundRPICameraSize = 10 * 1024 * 1024
 )
 
+func safeArchivePath(baseDir string, name string) (string, error) {
+	name = filepath.Clean(filepath.FromSlash(name))
+	if name == "." || !filepath.IsLocal(name) {
+		return "", fmt.Errorf("invalid archive entry: %s", name)
+	}
+
+	targetPath := filepath.Join(baseDir, name)
+	if targetPath != baseDir && !strings.HasPrefix(targetPath, baseDir+string(filepath.Separator)) {
+		return "", fmt.Errorf("invalid archive entry: %s", name)
+	}
+
+	return targetPath, nil
+}
+
 func dumpTar(src io.Reader) error {
-
 	uncompressed, err := gzip.NewReader(src)
-
 	if err != nil {
-
 		return err
+	}
 
+	baseDir, err := filepath.Abs(".")
+	if err != nil {
+		return err
 	}
 
 	tr := tar.NewReader(uncompressed)
 
 	for {
-
 		var header *tar.Header
-
 		header, err = tr.Next()
-
 		if err != nil {
-
 			if errors.Is(err, io.EOF) {
-
 				break
-
 			}
-
 			return err
+		}
 
+		var targetPath string
+		targetPath, err = safeArchivePath(baseDir, header.Name)
+		if err != nil {
+			return err
 		}
 
 		switch header.Typeflag {
-
 		case tar.TypeDir:
-
-			err = os.Mkdir(header.Name, header.FileInfo().Mode())
-
+			err = os.Mkdir(targetPath, header.FileInfo().Mode())
 			if err != nil {
-
 				return err
-
 			}
 
 		case tar.TypeReg:
-
 			var f *os.File
-
-			f, err = os.OpenFile(header.Name, os.O_WRONLY|os.O_CREATE, header.FileInfo().Mode())
-
+			f, err = os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE, header.FileInfo().Mode())
 			if err != nil {
-
 				return err
-
 			}
-
 			defer f.Close()
 
 			_, err = io.Copy(f, tr)
-
 			if err != nil {
-
 				return err
-
 			}
-
 		}
-
 	}
 
 	return nil
-
 }
 
 func doSingle(version string, f string) error {
-
 	err := os.RemoveAll(strings.TrimSuffix(f, ".tar.gz"))
-
 	if err != nil {
-
 		return err
-
 	}
 
 	res, err := http.Get("https://github.com/bluenviron/mediamtx-rpicamera/releases/download/" + version + "/" + f)
-
 	if err != nil {
-
 		return err
-
 	}
-
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-
 		return fmt.Errorf("bad status code: %v", res.StatusCode)
-
 	}
 
 	buf, err := io.ReadAll(&customLimitReader{res.Body, maxInboundRPICameraSize})
-
 	if err != nil {
-
 		return err
-
 	}
 
 	hashBuf, err := os.ReadFile("./mtxrpicamdownloader/HASH_" + strings.ToUpper(strings.ReplaceAll(f, ".", "_")))
-
 	if err != nil {
-
 		return err
-
 	}
-
 	str := strings.TrimSpace(string(hashBuf))
 
 	hash, err := hex.DecodeString(str)
-
 	if err != nil {
-
 		return err
-
 	}
 
 	if sum := sha256.Sum256(buf); !bytes.Equal(sum[:], hash) {
-
 		return fmt.Errorf("hash mismatch")
-
 	}
 
 	return dumpTar(bytes.NewReader(buf))
-
 }
 
 func do() error {
-
 	buf, err := os.ReadFile("./mtxrpicamdownloader/VERSION")
-
 	if err != nil {
-
 		return err
-
 	}
-
 	version := strings.TrimSpace(string(buf))
 
 	log.Printf("downloading mediamtx-rpicamera %s...", version)
 
 	for _, f := range []string{"mtxrpicam_32.tar.gz", "mtxrpicam_64.tar.gz"} {
-
 		err = doSingle(version, f)
-
 		if err != nil {
-
 			return err
-
 		}
-
 	}
 
 	log.Println("ok")
-
 	return nil
-
 }
 
 func main() {
-
 	err := do()
-
 	if err != nil {
-
 		log.Printf("ERR: %v", err)
-
 		os.Exit(1)
-
 	}
-
 }

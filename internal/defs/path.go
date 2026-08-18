@@ -5,180 +5,126 @@ import (
 	"time"
 
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
-	"github.com/bluenviron/mediamtx/internal/conf"
-	"github.com/bluenviron/mediamtx/internal/externalcmd"
-	"github.com/bluenviron/mediamtx/internal/logger"
-	"github.com/bluenviron/mediamtx/internal/stream"
+
+	"github.com/akurosia/mediamtx/internal/conf"
+	"github.com/akurosia/mediamtx/internal/externalcmd"
+	"github.com/akurosia/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/stream"
 )
 
 // PathNoStreamAvailableError is returned when no one is publishing.
-
 type PathNoStreamAvailableError struct {
 	PathName string
 }
 
 // Error implements the error interface.
-
 func (e *PathNoStreamAvailableError) Error() string {
-
 	return fmt.Sprintf("no stream is available on path '%s'", e.PathName)
-
 }
 
 // Path is a path.
-
 type Path interface {
 	Name() string
-
 	SafeConf() *conf.Path
-
 	ExternalCmdEnv() externalcmd.Environment
-
 	RemovePublisher(req PathRemovePublisherReq)
-
 	RemoveReader(req PathRemoveReaderReq)
 }
 
 // PathFindPathConfRes contains the response of FindPathConf().
-
 type PathFindPathConfRes struct {
 	Conf *conf.Path
-
 	User string
-
-	Err error
+	Err  error
 }
 
 // PathFindPathConfReq contains arguments of FindPathConf().
-
 type PathFindPathConfReq struct {
-	Author logger.Writer
-
+	Author        logger.Writer
 	AccessRequest PathAccessRequest
-
-	Res chan PathFindPathConfRes
+	Res           chan PathFindPathConfRes
 }
 
 // PathDescribeRes contains the response of Describe().
-
 type PathDescribeRes struct {
-	Path Path
-
-	Stream *stream.Stream
-
+	Path     Path
+	Stream   *stream.Stream
 	Redirect string
-
-	Err error
+	Err      error
 }
 
 // PathDescribeReq contains arguments of Describe().
-
 type PathDescribeReq struct {
-	Author logger.Writer
-
+	Author        logger.Writer
 	AccessRequest PathAccessRequest
-
-	Res chan PathDescribeRes
+	Res           chan PathDescribeRes
 }
 
 // PathAddPublisherRes contains the response of AddPublisher().
-
 type PathAddPublisherRes struct {
-	Path Path
-
-	User string
-
+	Path      Path
+	User      string
 	JWTExpiry time.Time
-
 	SubStream *stream.SubStream
-
-	Err error
+	Err       error
 }
 
 // PathAddPublisherReq contains arguments of AddPublisher().
-
 type PathAddPublisherReq struct {
-	Author Publisher
-
-	Desc *description.Session
-
+	Author        Publisher
+	Desc          *description.Session
 	UseRTPPackets bool
-
-	ReplaceNTP bool
-
+	ReplaceNTP    bool
 	ConfToCompare *conf.Path
-
 	AccessRequest PathAccessRequest
-
-	JWTExpiry time.Time
-
-	Res chan PathAddPublisherRes
+	JWTExpiry     time.Time
+	Res           chan PathAddPublisherRes
 }
 
 // PathRemovePublisherReq contains arguments of RemovePublisher().
-
 type PathRemovePublisherReq struct {
 	Author Publisher
-
-	Res chan struct{}
+	Res    chan struct{}
 }
 
 // PathAddReaderRes contains the response of AddReader().
-
 type PathAddReaderRes struct {
-	Path Path
-
-	User string
-
+	Path      Path
+	User      string
 	JWTExpiry time.Time
-
-	Stream *stream.Stream
-
-	Err error
+	Stream    *stream.Stream
+	Err       error
 }
 
 // PathAddReaderReq contains arguments of AddReader().
-
 type PathAddReaderReq struct {
-	Author Reader
-
+	Author        Reader
 	AccessRequest PathAccessRequest
-
-	JWTExpiry time.Time
-
-	Res chan PathAddReaderRes
+	JWTExpiry     time.Time
+	Res           chan PathAddReaderRes
 }
 
 // PathRemoveReaderReq contains arguments of RemoveReader().
-
 type PathRemoveReaderReq struct {
 	Author Reader
-
-	Res chan struct{}
+	Res    chan struct{}
 }
 
 // PathSourceStaticSetReadyRes contains the response of SetReady().
-
 type PathSourceStaticSetReadyRes struct {
 	SubStream *stream.SubStream
-
-	Err error
+	Err       error
 }
 
 // PathSourceStaticSetReadyReq contains arguments of SetReady().
-
 type PathSourceStaticSetReadyReq struct {
-	Desc *description.Session
-
+	Desc          *description.Session
 	UseRTPPackets bool
-
-	ReplaceNTP bool
-
-	Res chan PathSourceStaticSetReadyRes
+	ReplaceNTP    bool
+	Res           chan PathSourceStaticSetReadyRes
 }
 
 // PathSourceStaticSetNotReadyReq contains arguments of SetNotReady().
-
 type PathSourceStaticSetNotReadyReq struct {
 	Res chan struct{}
 }

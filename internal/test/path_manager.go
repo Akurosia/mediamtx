@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/bluenviron/mediamtx/internal/defs"
+	"github.com/akurosia/mediamtx/internal/defs"
 )
 
 // PathManager is a dummy path manager.

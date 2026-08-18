@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bluenviron/mediamtx/internal/defs"
-	"github.com/bluenviron/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/defs"
+	"github.com/akurosia/mediamtx/internal/logger"
 )
 
 const (

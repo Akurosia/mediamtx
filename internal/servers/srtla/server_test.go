@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bluenviron/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/logger"
 	"github.com/stretchr/testify/require"
 )
 

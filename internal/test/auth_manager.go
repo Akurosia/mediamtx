@@ -1,7 +1,7 @@
 // Package test contains test utilities.
 package test
 
-import "github.com/bluenviron/mediamtx/internal/auth"
+import "github.com/akurosia/mediamtx/internal/auth"
 
 // AuthManager is a dummy auth manager.
 type AuthManager struct {

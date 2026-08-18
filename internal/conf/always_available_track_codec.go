@@ -1,6 +1,6 @@
 package conf
 
-import "github.com/bluenviron/mediamtx/internal/conf/jsonwrapper"
+import "github.com/akurosia/mediamtx/internal/conf/jsonwrapper"
 
 // AlwaysAvailableTrackCodec is a codec of AlwaysAvailableTrack.
 type AlwaysAvailableTrackCodec string
