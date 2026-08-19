@@ -62,8 +62,6 @@ type group struct {
 	path           string
 	bytesReceived  atomic.Uint64
 	bytesForwarded atomic.Uint64
-	started        time.Time
-	lastDiagnostic time.Time
 }
 
 func (g *group) shortID() string {
@@ -270,7 +268,6 @@ func (s *Server) handleReg1(data []byte, addr *net.UDPAddr) {
 		id:       fullID,
 		lastSeen: now,
 		lastAddr: addr,
-		started:  now,
 		conns: []*connEntry{{
 			addr:     addr,
 			addrPort: addrPort,
@@ -425,23 +422,10 @@ func (s *Server) handleData(data []byte, addr *net.UDPAddr) {
 
 	// SRT data packets: bit 7 of byte 0 is 0; control packets: bit 7 is 1.
 	var ackAddr *net.UDPAddr
-	var diagnostic bool
-	var diagnosticSeq uint32
-	var diagnosticTimestamp uint32
-	var diagnosticPath string
-	var diagnosticSinceStart time.Duration
 	if data[0]&0x80 == 0 {
 		seqNum := binary.BigEndian.Uint32(data[:4])
 		conn.seqNums = append(conn.seqNums, seqNum)
 		conn.seqCount++
-		if now.Sub(g.lastDiagnostic) >= time.Second {
-			g.lastDiagnostic = now
-			diagnostic = true
-			diagnosticSeq = seqNum & 0x7fffffff
-			diagnosticTimestamp = binary.BigEndian.Uint32(data[8:12])
-			diagnosticPath = g.path
-			diagnosticSinceStart = now.Sub(g.started)
-		}
 
 		if conn.seqCount >= recvACKInterval {
 			ackAddr = addr
@@ -478,11 +462,6 @@ func (s *Server) handleData(data []byte, addr *net.UDPAddr) {
 	}
 	if n2 > 0 {
 		g.bytesForwarded.Add(uint64(n2))
-	}
-	if diagnostic {
-		s.Log(logger.Debug,
-			"group %s: timing path=%q source=%s arrival_monotonic=%s srt_seq=%d srt_timestamp_us=%d",
-			g.shortID(), diagnosticPath, addr, diagnosticSinceStart, diagnosticSeq, diagnosticTimestamp)
 	}
 }
 

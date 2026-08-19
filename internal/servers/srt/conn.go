@@ -67,8 +67,6 @@ type conn struct {
 	user      string
 	sconn     srt.Conn
 	reader    *stream.Reader
-	diagMu    sync.Mutex
-	diagLast  map[uint16]time.Time
 }
 
 func (c *conn) initialize() {
@@ -77,11 +75,8 @@ func (c *conn) initialize() {
 	c.created = time.Now()
 	c.uuid = uuid.New()
 	c.state = defs.APISRTConnStateIdle
-	c.diagLast = make(map[uint16]time.Time)
 
 	c.Log(logger.Info, "opened")
-	c.Log(logger.Debug, "timing: connection_start wall=%s monotonic=0s",
-		c.created.UTC().Format(time.RFC3339Nano))
 
 	c.wg.Add(1)
 	go c.run()
@@ -185,12 +180,6 @@ func (c *conn) runPublish(streamID *streamID) error {
 		return err
 	}
 
-	c.mutex.Lock()
-	c.sconn = sconn
-	c.mutex.Unlock()
-	c.Log(logger.Debug, "timing: accepted path=%q wall=%s monotonic_since_open=%s",
-		streamID.path, time.Now().UTC().Format(time.RFC3339Nano), time.Since(c.created))
-
 	readerErr := make(chan error)
 	go func() {
 		readerErr <- c.runPublishReader(sconn, streamID, res.Conf)
@@ -209,10 +198,6 @@ func (c *conn) runPublish(streamID *streamID) error {
 }
 
 func (c *conn) runPublishReader(sconn srt.Conn, streamID *streamID, pathConf *conf.Path) error {
-	diagnosticsDone := make(chan struct{})
-	go c.runTimingDiagnostics(sconn, streamID.path, diagnosticsDone)
-	defer close(diagnosticsDone)
-
 	sconn.SetReadDeadline(time.Now().Add(time.Duration(c.readTimeout)))
 	r := &mpegts.EnhancedReader{R: sconn}
 	err := r.Initialize()
