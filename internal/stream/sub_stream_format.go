@@ -100,7 +100,7 @@ func (ssf *subStreamFormat) writeUnitInner(u *unit.Unit) error {
 				time.Second, time.Duration(ssf.streamFormat.outFormat.ClockRate())))
 	}
 
-	if ssf.streamFormat.replaceNTP && u.NTP.IsZero() {
+	if ssf.streamFormat.replaceNTP {
 		u.NTP = ssf.streamFormat.ntpEstimator.Estimate(u.PTS)
 	}
 

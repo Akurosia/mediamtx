@@ -56,26 +56,19 @@ type conn struct {
 	pathManager         serverPathManager
 	parent              *Server
 
-	ctx              context.Context
-	ctxCancel        func()
-	created          time.Time
-	uuid             uuid.UUID
-	mutex            sync.RWMutex
-	state            defs.APISRTConnState
-	pathName         string
-	query            string
-	user             string
-	sconn            srt.Conn
-	reader           *stream.Reader
-	diagMu           sync.Mutex
-	diagLast         map[uint16]time.Time
-	syncMu           sync.Mutex
-	syncAnchorPTS    int64
-	syncAnchorUTC    time.Time
-	syncFrameStep    int64
-	syncLastVideoPTS int64
-	syncReady        bool
-	syncLogged       bool
+	ctx       context.Context
+	ctxCancel func()
+	created   time.Time
+	uuid      uuid.UUID
+	mutex     sync.RWMutex
+	state     defs.APISRTConnState
+	pathName  string
+	query     string
+	user      string
+	sconn     srt.Conn
+	reader    *stream.Reader
+	diagMu    sync.Mutex
+	diagLast  map[uint16]time.Time
 }
 
 func (c *conn) initialize() {

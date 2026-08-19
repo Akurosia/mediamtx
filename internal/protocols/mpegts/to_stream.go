@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
@@ -28,12 +27,6 @@ type TimingDiagnostics interface {
 	LogMPEGTSTiming(track int, pid uint16, kind string, pts int64, dts int64, au [][]byte)
 }
 
-// TimingSynchronizer maps a raw 90 kHz MPEG-TS timestamp onto a shared clock.
-// It is currently used by SRT publishers that carry Moblin UTC timecode.
-type TimingSynchronizer interface {
-	SynchronizeMPEGTSTiming(kind string, pts int64, au [][]byte) (int64, time.Time, bool)
-}
-
 // ToStream maps a MPEG-TS stream to a MediaMTX stream.
 func ToStream(
 	r *EnhancedReader,
@@ -43,19 +36,9 @@ func ToStream(
 	var medias []*description.Media //nolint:prealloc
 	var unsupportedTracks []int
 	diagnostics, _ := l.(TimingDiagnostics)
-	synchronizer, _ := l.(TimingSynchronizer)
 
 	td := &mpegts.TimeDecoder{}
 	td.Initialize()
-	decodeTime := func(kind string, rawPTS int64, au [][]byte) (int64, time.Time) {
-		pts := td.Decode(rawPTS)
-		if synchronizer != nil {
-			if synchronizedPTS, ntp, ok := synchronizer.SynchronizeMPEGTSTiming(kind, rawPTS, au); ok {
-				return synchronizedPTS, ntp
-			}
-		}
-		return pts, time.Time{}
-	}
 
 	for i, track := range r.Tracks() { //nolint:dupl
 		var medi *description.Media
@@ -73,11 +56,10 @@ func ToStream(
 				if diagnostics != nil {
 					diagnostics.LogMPEGTSTiming(i, track.PID, "H265", pts, dts, au)
 				}
-				pts, ntp := decodeTime("H265", pts, au)
+				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
 					PTS:     pts, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
-					NTP:     ntp,
 					Payload: unit.PayloadH265(au),
 				})
 				return nil
@@ -96,11 +78,10 @@ func ToStream(
 				if diagnostics != nil {
 					diagnostics.LogMPEGTSTiming(i, track.PID, "H264", pts, dts, au)
 				}
-				pts, ntp := decodeTime("H264", pts, au)
+				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
 					PTS:     pts, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
-					NTP:     ntp,
 					Payload: unit.PayloadH264(au),
 				})
 				return nil
@@ -115,11 +96,10 @@ func ToStream(
 			}
 
 			r.OnDataMPEG4Video(track, func(pts int64, frame []byte) error {
-				pts, ntp := decodeTime("MPEG4Video", pts, nil)
+				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
 					PTS:     pts, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
-					NTP:     ntp,
 					Payload: unit.PayloadMPEG4Video(frame),
 				})
 				return nil
@@ -132,11 +112,10 @@ func ToStream(
 			}
 
 			r.OnDataMPEG1Video(track, func(pts int64, frame []byte) error {
-				pts, ntp := decodeTime("MPEG1Video", pts, nil)
+				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
 					PTS:     pts, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
-					NTP:     ntp,
 					Payload: unit.PayloadMPEG1Video(frame),
 				})
 				return nil
@@ -155,11 +134,10 @@ func ToStream(
 				if diagnostics != nil {
 					diagnostics.LogMPEGTSTiming(i, track.PID, "Opus", pts, pts, nil)
 				}
-				pts, ntp := decodeTime("Opus", pts, nil)
+				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
 					PTS:     multiplyAndDivide(pts, int64(medi.Formats[0].ClockRate()), 90000),
-					NTP:     ntp,
 					Payload: unit.PayloadOpus(packets),
 				})
 				return nil
@@ -173,11 +151,10 @@ func ToStream(
 				}},
 			}
 			r.OnDataKLV(track, func(pts int64, uni []byte) error {
-				pts, ntp := decodeTime("KLV", pts, nil)
+				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
 					PTS:     pts,
-					NTP:     ntp,
 					Payload: unit.PayloadKLV(uni),
 				})
 				return nil
@@ -199,11 +176,10 @@ func ToStream(
 				if diagnostics != nil {
 					diagnostics.LogMPEGTSTiming(i, track.PID, "MPEG4Audio", pts, pts, nil)
 				}
-				pts, ntp := decodeTime("MPEG4Audio", pts, nil)
+				pts = td.Decode(pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
 					PTS:     multiplyAndDivide(pts, int64(medi.Formats[0].ClockRate()), 90000),
-					NTP:     ntp,
 					Payload: unit.PayloadMPEG4Audio(aus),
 				})
 				return nil
