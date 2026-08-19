@@ -2,9 +2,26 @@ package srt
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestMPEGTSTimestampDeltaWrap(t *testing.T) {
+	require.Equal(t, int64(20), mpegtsTimestampDelta(10, (1<<33)-10))
+}
+
+func TestMoblinTimecodeNearNow(t *testing.T) {
+	now := time.Date(2026, 8, 19, 10, 54, 21, 0, time.UTC)
+	out, ok := moblinTimecodeNearNow("10:54:18+frame:51", now, 1500)
+	require.True(t, ok)
+	require.Equal(t, time.Date(2026, 8, 19, 10, 54, 18, 850000000, time.UTC), out)
+
+	// A timecode just before midnight belongs to the previous day.
+	out, ok = moblinTimecodeNearNow("23:59:59+frame:0", time.Date(2026, 8, 20, 0, 0, 1, 0, time.UTC), 1500)
+	require.True(t, ok)
+	require.Equal(t, time.Date(2026, 8, 19, 23, 59, 59, 0, time.UTC), out)
+}
 
 func appendBits(dst []bool, value uint32, count int) []bool {
 	for i := count - 1; i >= 0; i-- {

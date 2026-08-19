@@ -11,6 +11,102 @@ import (
 
 const timingDiagnosticsInterval = 2 * time.Second
 
+// All synchronized publishers are released on the same UTC timeline with
+// enough headroom for typical mobile SRT latency and jitter.
+const moblinSyncPlayoutLatency = 5 * time.Second
+
+const mpegtsTimestampMask = int64(1<<33 - 1)
+
+func mpegtsTimestampDelta(a int64, b int64) int64 {
+	return (a - b) & mpegtsTimestampMask
+}
+
+func moblinTimecodeNearNow(value string, now time.Time, frameStep int64) (time.Time, bool) {
+	var hour, minute, second, frame int
+	if _, err := fmt.Sscanf(value, "%02d:%02d:%02d+frame:%d", &hour, &minute, &second, &frame); err != nil {
+		return time.Time{}, false
+	}
+
+	now = now.UTC()
+	out := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, second, 0, time.UTC)
+	if out.Sub(now) > 12*time.Hour {
+		out = out.Add(-24 * time.Hour)
+	} else if now.Sub(out) > 12*time.Hour {
+		out = out.Add(24 * time.Hour)
+	}
+	if frameStep > 0 {
+		out = out.Add(time.Duration(int64(frame) * frameStep * int64(time.Second) / 90000))
+	}
+	return out, true
+}
+
+// SynchronizeMPEGTSTiming implements mpegts.TimingSynchronizer. The
+// authenticated user is the synchronization group; authentication already
+// limits membership to paths matching that user's publish permissions.
+func (c *conn) SynchronizeMPEGTSTiming(kind string, pts int64, au [][]byte) (int64, time.Time, bool) {
+	c.mutex.RLock()
+	user := c.user
+	path := c.pathName
+	c.mutex.RUnlock()
+	if user == "" {
+		return 0, time.Time{}, false
+	}
+
+	c.syncMu.Lock()
+	if kind == "H265" {
+		if c.syncLastVideoPTS != 0 {
+			step := mpegtsTimestampDelta(pts, c.syncLastVideoPTS)
+			if step > 0 && step < 9000 {
+				c.syncFrameStep = step
+			}
+		}
+		c.syncLastVideoPTS = pts
+
+		for _, nal := range au {
+			value, ok := decodeMoblinHEVCTimecode(nal)
+			if !ok {
+				continue
+			}
+			utc, ok := moblinTimecodeNearNow(value, time.Now(), c.syncFrameStep)
+			if !ok {
+				continue
+			}
+			c.syncAnchorPTS = pts
+			c.syncAnchorUTC = utc
+			c.syncReady = true
+			if !c.syncLogged {
+				c.syncLogged = true
+				c.Log(logger.Info, "Moblin synchronization enabled: group=%q path=%q playout_latency=%s",
+					user, path, moblinSyncPlayoutLatency)
+			}
+			break
+		}
+	}
+
+	if !c.syncReady {
+		c.syncMu.Unlock()
+		return 0, time.Time{}, false
+	}
+
+	ntp := c.syncAnchorUTC.Add(time.Duration(mpegtsTimestampDelta(pts, c.syncAnchorPTS)) * time.Second / 90000)
+	// Keep the standard 33-bit MPEG-TS clock range while making its phase
+	// depend only on UTC, not on the individual connection start time.
+	synchronizedPTS := (ntp.Unix()*90000 + int64(ntp.Nanosecond())*90000/int64(time.Second)) & mpegtsTimestampMask
+	c.syncMu.Unlock()
+
+	deadline := ntp.Add(moblinSyncPlayoutLatency)
+	if delay := time.Until(deadline); delay > 0 {
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+		case <-c.ctx.Done():
+			timer.Stop()
+		}
+	}
+
+	return synchronizedPTS, ntp, true
+}
+
 func (c *conn) runTimingDiagnostics(sconn srt.Conn, path string, done <-chan struct{}) {
 	ticker := time.NewTicker(timingDiagnosticsInterval)
 	defer ticker.Stop()

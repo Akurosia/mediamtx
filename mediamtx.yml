@@ -60,6 +60,8 @@ authMethod: internal
 # Internal authentication.
 # Enabled users.
 authInternalUsers:
+  # Moblin H265 streams published by the same named user are synchronized
+  # automatically when their paths match this user's publish permissions.
   # Default unprivileged user.
   # Username. 'any' means any user, including anonymous ones.
   - user: any
