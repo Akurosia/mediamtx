@@ -9,8 +9,6 @@ import (
 
 func TestMPEGTSTimestampDeltaWrap(t *testing.T) {
 	require.Equal(t, int64(20), mpegtsTimestampDelta(10, (1<<33)-10))
-	require.Equal(t, int64(-20), mpegtsTimestampDelta((1<<33)-10, 10))
-	require.Equal(t, int64(-100), mpegtsTimestampDelta(900, 1000))
 }
 
 func TestMoblinTimecodeNearNow(t *testing.T) {

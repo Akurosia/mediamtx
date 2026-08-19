@@ -73,7 +73,6 @@ type conn struct {
 	syncAnchorPTS    int64
 	syncAnchorUTC    time.Time
 	syncFrameStep    int64
-	syncFrameSamples int
 	syncLastVideoPTS int64
 	syncReady        bool
 	syncLogged       bool
