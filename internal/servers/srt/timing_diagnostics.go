@@ -18,7 +18,11 @@ const moblinSyncPlayoutLatency = 5 * time.Second
 const mpegtsTimestampMask = int64(1<<33 - 1)
 
 func mpegtsTimestampDelta(a int64, b int64) int64 {
-	return (a - b) & mpegtsTimestampMask
+	delta := (a - b) & mpegtsTimestampMask
+	if delta > 1<<32 {
+		delta -= 1 << 33
+	}
+	return delta
 }
 
 func moblinTimecodeNearNow(value string, now time.Time, frameStep int64) (time.Time, bool) {
@@ -53,14 +57,24 @@ func (c *conn) SynchronizeMPEGTSTiming(kind string, pts int64, au [][]byte) (int
 	}
 
 	c.syncMu.Lock()
-	if kind == "H265" {
+	if kind == "H265" && !c.syncReady {
 		if c.syncLastVideoPTS != 0 {
 			step := mpegtsTimestampDelta(pts, c.syncLastVideoPTS)
 			if step > 0 && step < 9000 {
-				c.syncFrameStep = step
+				if c.syncFrameStep == 0 || step < c.syncFrameStep {
+					c.syncFrameStep = step
+				}
+				c.syncFrameSamples++
 			}
 		}
 		c.syncLastVideoPTS = pts
+
+		// Observe several frames before selecting an anchor. This determines
+		// the real frame interval even when encoded frames arrive in DTS order.
+		if c.syncFrameSamples < 8 {
+			c.syncMu.Unlock()
+			return 0, time.Time{}, false
+		}
 
 		for _, nal := range au {
 			value, ok := decodeMoblinHEVCTimecode(nal)
