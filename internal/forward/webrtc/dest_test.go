@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/akurosia/mediamtx/internal/conf"
+	"github.com/akurosia/mediamtx/internal/defs"
 	forwardwebrtc "github.com/akurosia/mediamtx/internal/forward/webrtc"
 	mtxwebrtc "github.com/akurosia/mediamtx/internal/protocols/webrtc"
 	"github.com/akurosia/mediamtx/internal/stream"
@@ -181,7 +182,13 @@ func TestDest(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return dest.OutboundBytes() > 0
+		return dest.Info().OutboundBytes > 0
+	}, 5*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		info := dest.Info()
+		typeSpecific, ok := info.TypeSpecific.(*defs.APIForwardDestTypeSpecificWebRTC)
+		return ok && typeSpecific.RemoteAddr != "" && typeSpecific.PeerConnectionEstablished &&
+			typeSpecific.OutboundBytes == info.OutboundBytes && typeSpecific.OutboundRTPPackets > 0
 	}, 5*time.Second, 10*time.Millisecond)
 
 	cancel()

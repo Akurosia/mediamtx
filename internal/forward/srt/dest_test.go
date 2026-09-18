@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/akurosia/mediamtx/internal/conf"
+	"github.com/akurosia/mediamtx/internal/defs"
 	"github.com/akurosia/mediamtx/internal/forward/srt"
 	"github.com/akurosia/mediamtx/internal/stream"
 	"github.com/akurosia/mediamtx/internal/test"
@@ -109,7 +110,12 @@ func TestDest(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return dest.OutboundBytes() > 0
+		return dest.Info().OutboundBytes > 0
+	}, 5*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		info := dest.Info()
+		typeSpecific, ok := info.TypeSpecific.(*defs.APIForwardDestTypeSpecificSRT)
+		return ok && typeSpecific.RemoteAddr == ln.Addr().String() && typeSpecific.BytesSent == info.OutboundBytes
 	}, 5*time.Second, 10*time.Millisecond)
 
 	cancel()

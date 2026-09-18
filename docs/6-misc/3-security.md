@@ -17,7 +17,7 @@ Binaries published in the [Releases](https://github.com/akurosia/mediamtx/releas
 It is possible to verify that SHA256 checksums of binaries correspond to the one published on Sigstore by running:
 
 ```sh
-ls mediamtx_* | xargs -L1 gh attestation verify --repo bluenviron/mediamtx
+ls mediamtx_* | xargs -L1 gh attestation verify --repo akurosia/mediamtx
 ```
 
 It is possible to verify that binaries have not been altered during transfer from GitHub to the final destination by downloading `checksums.sha256` and running:

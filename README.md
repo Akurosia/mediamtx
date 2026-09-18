@@ -9,8 +9,8 @@
 [![Website](https://img.shields.io/badge/website-mediamtx.org-1c94b5)](https://mediamtx.org)
 [![Test](https://github.com/akurosia/mediamtx/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/akurosia/mediamtx/actions/workflows/test.yml?query=branch%3Amain)
 [![Lint](https://github.com/akurosia/mediamtx/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/akurosia/mediamtx/actions/workflows/lint.yml?query=branch%3Amain)
-[![CodeCov](https://codecov.io/gh/bluenviron/mediamtx/branch/main/graph/badge.svg)](https://app.codecov.io/gh/bluenviron/mediamtx/tree/main)
-[![Release](https://img.shields.io/github/v/release/bluenviron/mediamtx)](https://github.com/akurosia/mediamtx/releases)
+[![CodeCov](https://codecov.io/gh/akurosia/mediamtx/branch/main/graph/badge.svg)](https://app.codecov.io/gh/akurosia/mediamtx/tree/main)
+[![Release](https://img.shields.io/github/v/release/akurosia/mediamtx)](https://github.com/akurosia/mediamtx/releases)
 [![Docker Hub](https://img.shields.io/badge/docker-bluenviron/mediamtx-blue)](https://hub.docker.com/r/bluenviron/mediamtx)
 
 </h1>

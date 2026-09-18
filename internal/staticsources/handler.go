@@ -3,9 +3,11 @@ package staticsources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/akurosia/mediamtx/internal/conf"
@@ -27,6 +29,9 @@ const (
 	retryPause = 5 * time.Second
 )
 
+// ErrNoStaticSource is returned when a path has no static source.
+var ErrNoStaticSource = errors.New("path has no static source")
+
 func emptyTimer() *time.Timer {
 	t := time.NewTimer(0)
 	<-t.C
@@ -47,6 +52,7 @@ type staticSource interface {
 	logger.Writer
 	Run(defs.StaticSourceRunParams) error
 	APISourceDescribe() *defs.APIPathSource
+	Info() defs.StaticSourceInfo
 }
 
 type handlerPathManager interface {
@@ -79,6 +85,10 @@ type Handler struct {
 	instance  staticSource
 	running   bool
 	query     string
+	created   time.Time
+	mutex     sync.RWMutex
+	state     defs.APIStaticSourceState
+	lastError string
 
 	// in
 	chReloadConf          chan *conf.Path
@@ -94,6 +104,8 @@ func (s *Handler) Initialize() {
 	s.chReloadConf = make(chan *conf.Path)
 	s.chInstanceSetReady = make(chan defs.PathSourceStaticSetReadyReq)
 	s.chInstanceSetNotReady = make(chan defs.PathSourceStaticSetNotReadyReq)
+	s.created = time.Now()
+	s.state = defs.APIStaticSourceStateIdle
 
 	switch {
 	case strings.HasPrefix(s.Conf.Source, "rtsp://") ||
@@ -228,6 +240,11 @@ func (s *Handler) Stop(reason string) {
 
 	// we must wait since s.ctx is not thread safe
 	<-s.done
+
+	s.mutex.Lock()
+	s.state = defs.APIStaticSourceStateIdle
+	s.lastError = ""
+	s.mutex.Unlock()
 }
 
 // Log implements logger.Writer.
@@ -245,6 +262,11 @@ func (s *Handler) run() {
 
 	recreate := func() {
 		resolvedSource := resolveSource(s.Conf.Source, s.Matches, s.query)
+
+		s.mutex.Lock()
+		s.state = defs.APIStaticSourceStateRunning
+		s.lastError = ""
+		s.mutex.Unlock()
 
 		runCtx, runCtxCancel = context.WithCancel(context.Background())
 		go func() {
@@ -267,6 +289,12 @@ func (s *Handler) run() {
 		case err := <-runErr:
 			runCtxCancel()
 			s.instance.Log(logger.Error, err.Error())
+
+			s.mutex.Lock()
+			s.state = defs.APIStaticSourceStateError
+			s.lastError = err.Error()
+			s.mutex.Unlock()
+
 			recreating = true
 			recreateTimer = time.NewTimer(retryPause)
 
@@ -322,6 +350,22 @@ func (s *Handler) ReloadConf(newConf *conf.Path) {
 // APISourceDescribe instanceements source.
 func (s *Handler) APISourceDescribe() *defs.APIPathSource {
 	return s.instance.APISourceDescribe()
+}
+
+// APIItem returns an API item.
+func (s *Handler) APIItem() *defs.APIStaticSource {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	info := s.instance.Info()
+
+	return &defs.APIStaticSource{
+		Type:         s.instance.APISourceDescribe().Type,
+		State:        s.state,
+		LastError:    s.lastError,
+		Created:      s.created,
+		TypeSpecific: info.TypeSpecific,
+	}
 }
 
 // SetReady is called by a staticSource.

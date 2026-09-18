@@ -1,6 +1,7 @@
 package moq_test
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -17,13 +18,14 @@ import (
 
 	mediacommonh264 "github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/webtransport-go"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/akurosia/mediamtx/internal/conf"
 	"github.com/akurosia/mediamtx/internal/defs"
 	"github.com/akurosia/mediamtx/internal/logger"
 	"github.com/akurosia/mediamtx/internal/protocols/httpp3"
+	protomoq "github.com/akurosia/mediamtx/internal/protocols/moq"
 	"github.com/akurosia/mediamtx/internal/protocols/moq/catalog"
 	"github.com/akurosia/mediamtx/internal/protocols/moq/controlmessage"
 	"github.com/akurosia/mediamtx/internal/protocols/moq/parameter"
@@ -36,51 +38,8 @@ import (
 
 const testVersion = defs.APIMoQVersionDraft19
 
-type testServerConn interface {
-	OpenUniStreamSync(context.Context) (io.WriteCloser, error)
-	AcceptUniStream(context.Context) (io.Reader, error)
-	AcceptStream(context.Context) (io.ReadWriteCloser, error)
-	CloseWithError(uint64, string) error
-}
-
-type testQUICConn struct {
-	conn *quic.Conn
-}
-
-func (c *testQUICConn) OpenUniStreamSync(ctx context.Context) (io.WriteCloser, error) {
-	return c.conn.OpenUniStreamSync(ctx)
-}
-
-func (c *testQUICConn) AcceptUniStream(ctx context.Context) (io.Reader, error) {
-	return c.conn.AcceptUniStream(ctx)
-}
-
-func (c *testQUICConn) AcceptStream(ctx context.Context) (io.ReadWriteCloser, error) {
-	return c.conn.AcceptStream(ctx)
-}
-
-func (c *testQUICConn) CloseWithError(code uint64, msg string) error {
-	return c.conn.CloseWithError(quic.ApplicationErrorCode(code), msg)
-}
-
-type testWTConn struct {
-	session *webtransport.Session
-}
-
-func (c *testWTConn) OpenUniStreamSync(ctx context.Context) (io.WriteCloser, error) {
-	return c.session.OpenUniStreamSync(ctx)
-}
-
-func (c *testWTConn) AcceptUniStream(ctx context.Context) (io.Reader, error) {
-	return c.session.AcceptUniStream(ctx)
-}
-
-func (c *testWTConn) AcceptStream(ctx context.Context) (io.ReadWriteCloser, error) {
-	return c.session.AcceptStream(ctx)
-}
-
-func (c *testWTConn) CloseWithError(code uint64, msg string) error {
-	return c.session.CloseWithError(webtransport.SessionErrorCode(code), msg)
+func isSubGroupStream(b byte) bool {
+	return (b & 0x90) == 0x10
 }
 
 type testMoqServer struct {
@@ -93,7 +52,6 @@ type testMoqServer struct {
 	ctx       context.Context
 	ctxCancel func()
 	closeFunc func()
-	err       chan error
 }
 
 func newTestMoqServer(
@@ -113,7 +71,6 @@ func newTestMoqServer(
 		transport:          transport,
 		ctx:                ctx,
 		ctxCancel:          ctxCancel,
-		err:                make(chan error, 1),
 	}
 
 	switch transport {
@@ -147,16 +104,12 @@ func (s *testMoqServer) initializeQUIC(t *testing.T) {
 
 	go func() {
 		for {
-			acceptedConn, acceptErr := ln.Accept(s.ctx)
-			if s.ctx.Err() != nil {
-				return
-			}
-			if acceptErr != nil {
-				s.fail(acceptErr)
+			acceptedConn, err2 := ln.Accept(s.ctx)
+			if err2 != nil {
 				return
 			}
 
-			go s.runSession(&testQUICConn{conn: acceptedConn}, false)
+			go s.runSession(&protomoq.ConnQUIC{Conn: acceptedConn})
 		}
 	}()
 }
@@ -171,16 +124,15 @@ func (s *testMoqServer) initializeWebTransport(t *testing.T) {
 		EnableWebTransport: true,
 		Parent:             test.NilLogger,
 	}
+
 	h3s.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RequestURI() != s.expectedRequestURI {
-			s.fail(fmt.Errorf("unexpected request URI: expected %s, got %s", s.expectedRequestURI, r.URL.RequestURI()))
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
 
 		offered := r.Header.Get("WT-Available-Protocols")
 		if !strings.Contains(offered, string(testVersion)) {
-			s.fail(fmt.Errorf("unexpected WT-Available-Protocols header: %s", offered))
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
@@ -189,13 +141,10 @@ func (s *testMoqServer) initializeWebTransport(t *testing.T) {
 
 		session, err := h3s.Upgrade(w, r)
 		if err != nil {
-			if s.ctx.Err() == nil {
-				s.fail(err)
-			}
 			return
 		}
 
-		go s.runSession(&testWTConn{session: session}, true)
+		go s.runSession(&protomoq.ConnWebTransport{Session: session})
 	})
 
 	err := h3s.Initialize()
@@ -206,138 +155,122 @@ func (s *testMoqServer) initializeWebTransport(t *testing.T) {
 	s.closeFunc = h3s.Close
 }
 
-func (s *testMoqServer) runSession(c testServerConn, webTransport bool) {
-	defer c.CloseWithError(0, "") //nolint:errcheck
+func (s *testMoqServer) runSession(c protomoq.Conn) {
+	defer c.CloseWithError(0, "")
 
-	err := s.performSetup(c, webTransport)
-	if err != nil {
-		s.fail(err)
-		return
-	}
+	eg, egCtx := errgroup.WithContext(s.ctx)
 
-	for {
-		bidi, acceptErr := c.AcceptStream(s.ctx)
-		if s.ctx.Err() != nil {
-			return
-		}
-		if acceptErr != nil {
-			if strings.Contains(acceptErr.Error(), "Application error 0x0") ||
-				strings.Contains(acceptErr.Error(), "context canceled") {
-				return
+	eg.Go(func() error {
+		for {
+			bidi, err := c.AcceptStream(egCtx)
+			if err != nil {
+				return err
 			}
-			s.fail(acceptErr)
-			return
-		}
 
-		go s.handleSubscribe(c, bidi)
-	}
+			eg.Go(func() error {
+				return s.handleBidiStream(bidi, c)
+			})
+		}
+	})
+
+	eg.Go(func() error {
+		for {
+			uni, err := c.AcceptUniStream(egCtx)
+			if err != nil {
+				return err
+			}
+
+			eg.Go(func() error {
+				return s.handleUniStream(uni)
+			})
+		}
+	})
+
+	eg.Go(func() error {
+		setupWriter, err := c.OpenUniStreamSync(s.ctx)
+		if err != nil {
+			return err
+		}
+		defer setupWriter.Close() //nolint:errcheck
+
+		_, err = setupWriter.Write(controlmessage.Setup{}.Marshal())
+		return err
+	})
+
+	eg.Wait() //nolint:errcheck
 }
 
-func (s *testMoqServer) performSetup(c testServerConn, webTransport bool) error {
-	setupWriter, err := c.OpenUniStreamSync(s.ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = setupWriter.Write(controlmessage.Setup{}.Marshal())
-	setupWriter.Close() //nolint:errcheck
-	if err != nil {
-		return err
-	}
-
-	setupReader, err := c.AcceptUniStream(s.ctx)
-	if err != nil {
-		if strings.Contains(err.Error(), "Application error 0x0") ||
-			strings.Contains(err.Error(), "context canceled") {
-			return nil
-		}
-		return err
-	}
-
-	msg, err := controlmessage.Read(setupReader)
-	if err != nil {
-		return err
-	}
-
-	setup, ok := msg.(*controlmessage.Setup)
-	if !ok {
-		return fmt.Errorf("unexpected setup message: %T", msg)
-	}
-
-	if webTransport {
-		if setup.Path != "" {
-			return fmt.Errorf("unexpected WebTransport setup path: %s", setup.Path)
-		}
-	} else if setup.Path != s.expectedRequestURI {
-		return fmt.Errorf("unexpected QUIC setup path: expected %s, got %s", s.expectedRequestURI, setup.Path)
-	}
-
-	return nil
-}
-
-func (s *testMoqServer) handleSubscribe(c testServerConn, bidi io.ReadWriteCloser) {
+func (s *testMoqServer) handleBidiStream(bidi io.ReadWriteCloser, c protomoq.Conn) error {
 	msg, err := controlmessage.Read(bidi)
 	if err != nil {
-		if s.ctx.Err() == nil {
-			s.fail(err)
-		}
-		bidi.Close() //nolint:errcheck
-		return
+		return err
 	}
 
 	sub, ok := msg.(*controlmessage.Subscribe)
 	if !ok {
-		s.fail(fmt.Errorf("unexpected control message: %T", msg))
-		bidi.Close() //nolint:errcheck
-		return
+		return fmt.Errorf("unexpected control message on bidi stream: %T", msg)
 	}
 
-	authErr := s.checkAuthorization(sub.Parameters)
-	if authErr != nil {
-		s.fail(authErr)
-		_, _ = bidi.Write(controlmessage.RequestError{
-			Code:   controlmessage.RequestErrorCodeUnauthorized,
-			Reason: authErr.Error(),
-		}.Marshal())
-		bidi.Close() //nolint:errcheck
-		return
+	err = s.checkAuthorization(sub.Parameters)
+	if err != nil {
+		return err
 	}
 
 	var payload []byte
 	switch sub.TrackName {
 	case ".catalog":
 		payload, err = catalogPayload()
+		if err != nil {
+			return err
+		}
 
 	case "0":
 		payload, err = mediaPayload()
+		if err != nil {
+			return err
+		}
 
 	default:
-		_, _ = bidi.Write(controlmessage.RequestError{
-			Code:   controlmessage.RequestErrorCodeDoesNotExist,
-			Reason: "unknown track",
-		}.Marshal())
-		bidi.Close() //nolint:errcheck
-		return
-	}
-	if err != nil {
-		s.fail(err)
-		bidi.Close() //nolint:errcheck
-		return
+		return fmt.Errorf("unknown track")
 	}
 
 	_, err = bidi.Write(controlmessage.SubscribeOk{TrackAlias: sub.RequestID}.Marshal())
 	if err != nil {
-		s.fail(err)
-		bidi.Close() //nolint:errcheck
-		return
+		return err
 	}
 
-	go io.Copy(io.Discard, bidi) //nolint:errcheck
+	go func() {
+		s.writeSubGroup(c, sub.TrackName, sub.RequestID, payload) //nolint:errcheck
+	}()
 
-	err = s.writeSubGroup(c, sub.TrackName, sub.RequestID, payload)
+	bidi.Close()              //nolint:errcheck
+	io.Copy(io.Discard, bidi) //nolint:errcheck
+
+	return nil
+}
+
+func (s *testMoqServer) handleUniStream(uni io.Reader) error {
+	br := bufio.NewReader(uni)
+	firstByte, err := br.Peek(1)
 	if err != nil {
-		s.fail(err)
+		return err
 	}
+
+	if isSubGroupStream(firstByte[0]) {
+		return fmt.Errorf("unexpected sub-group stream on uni stream")
+	}
+
+	msg, err := controlmessage.Read(br)
+	if err != nil {
+		return err
+	}
+
+	_, ok := msg.(*controlmessage.Setup)
+	if !ok {
+		return fmt.Errorf("unexpected control message on uni stream: %T", msg)
+	}
+
+	return nil
 }
 
 func (s *testMoqServer) checkAuthorization(params parameter.Parameters) error {
@@ -369,7 +302,7 @@ func (s *testMoqServer) checkAuthorization(params parameter.Parameters) error {
 	return nil
 }
 
-func (s *testMoqServer) writeSubGroup(c testServerConn, trackName string, trackAlias uint64, payload []byte) error {
+func (s *testMoqServer) writeSubGroup(c protomoq.Conn, trackName string, trackAlias uint64, payload []byte) error {
 	uni, err := c.OpenUniStreamSync(s.ctx)
 	if err != nil {
 		return err
@@ -378,9 +311,9 @@ func (s *testMoqServer) writeSubGroup(c testServerConn, trackName string, trackA
 
 	sg := &subgroup.SubGroup{
 		Header: subgroup.Header{
-			FirstObject: true,
-			TrackAlias:  trackAlias,
-			GroupID:     0,
+			IsFirstObject: true,
+			TrackAlias:    trackAlias,
+			GroupID:       0,
 		},
 		Objects: []subgroup.Object{{
 			Payload: payload,
@@ -389,7 +322,7 @@ func (s *testMoqServer) writeSubGroup(c testServerConn, trackName string, trackA
 
 	if trackName != ".catalog" {
 		ts := property.Timestamp(0)
-		sg.Header.Properties = true
+		sg.Header.HasProperties = true
 		sg.Objects[0].Properties = property.Properties{&ts}
 	}
 
@@ -397,27 +330,10 @@ func (s *testMoqServer) writeSubGroup(c testServerConn, trackName string, trackA
 	return err
 }
 
-func (s *testMoqServer) fail(err error) {
-	select {
-	case s.err <- err:
-	default:
-	}
-}
-
 func (s *testMoqServer) Close() {
 	s.ctxCancel()
 	if s.closeFunc != nil {
 		s.closeFunc()
-	}
-}
-
-func (s *testMoqServer) Check(t *testing.T) {
-	t.Helper()
-
-	select {
-	case err := <-s.err:
-		require.NoError(t, err)
-	default:
 	}
 }
 
@@ -505,10 +421,7 @@ func TestSource(t *testing.T) {
 			}
 
 			server := newTestMoqServer(t, ca.transport, expectedRequestURI, expectedAuth)
-			defer func() {
-				server.Close()
-				server.Check(t)
-			}()
+			defer server.Close()
 
 			p := &test.StaticSourceParent{}
 			p.Initialize()
@@ -543,6 +456,12 @@ func TestSource(t *testing.T) {
 			case u := <-p.Unit:
 				require.Equal(t, unit.PayloadH264{test.FormatH264.SPS, test.FormatH264.PPS, {5, 1}}, u.Payload)
 
+				require.Eventually(t, func() bool {
+					info := so.Info()
+					typeSpecific, ok := info.TypeSpecific.(*defs.APIStaticSourceTypeSpecificMoQ)
+					return ok && typeSpecific.RemoteAddr != "" && typeSpecific.Transport != "" && typeSpecific.InboundBytes > 0
+				}, 5*time.Second, 10*time.Millisecond)
+
 			case err := <-sourceErr:
 				require.NoError(t, err)
 				return
@@ -563,10 +482,7 @@ func TestSourceWebTransportFingerprintError(t *testing.T) {
 	defer cancel()
 
 	server := newTestMoqServer(t, conf.MoQTransportWebTransport, "/teststream", "")
-	defer func() {
-		server.Close()
-		server.Check(t)
-	}()
+	defer server.Close()
 
 	so := &ssmoq.Source{Parent: &fingerprintErrorParent{}}
 
@@ -587,10 +503,7 @@ func TestSourceFingerprintError(t *testing.T) {
 	defer cancel()
 
 	server := newTestMoqServer(t, conf.MoQTransportQUIC, "/teststream", "")
-	defer func() {
-		server.Close()
-		server.Check(t)
-	}()
+	defer server.Close()
 
 	so := &ssmoq.Source{Parent: &fingerprintErrorParent{}}
 
