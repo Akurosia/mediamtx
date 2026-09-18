@@ -922,7 +922,9 @@ func (p *Core) createResources(initial bool) error {
 		p.moqServer = i
 	}
 
-	if currentConf.SRTLA && currentConf.SRT && p.srtlaServer == nil {
+	if currentConf.SRTLA &&
+		currentConf.SRT &&
+		p.srtlaServer == nil {
 		i := &srtla.Server{
 			Address:    currentConf.SRTLAAddress,
 			SRTAddress: currentConf.SRTAddress,
@@ -934,7 +936,7 @@ func (p *Core) createResources(initial bool) error {
 			return err
 		}
 		p.srtlaServer = i
-		p.srtServer.SRTLALinker = i
+		p.srtServer.SetSRTLALinker(i)
 	}
 
 	if currentConf.OMT && p.omtServer == nil {
@@ -1315,6 +1317,9 @@ func (p *Core) closeResources(newConf *conf.Conf) {
 	}
 
 	if closeSRTLAServer && p.srtlaServer != nil {
+		if p.srtServer != nil {
+			p.srtServer.SetSRTLALinker(nil)
+		}
 		p.srtlaServer.Close()
 		p.srtlaServer = nil
 	}
