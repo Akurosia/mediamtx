@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/http2"
-
 	"github.com/akurosia/mediamtx/internal/certloader"
 	"github.com/akurosia/mediamtx/internal/logger"
 	"github.com/akurosia/mediamtx/internal/packetdumper"
@@ -136,13 +134,10 @@ func (s *Server) Initialize() error {
 	}
 
 	if tlsConfig != nil {
-		err := http2.ConfigureServer(s.inner, &http2.Server{})
-		if err != nil {
-			if s.loader != nil {
-				s.loader.Close()
-			}
-			return err
-		}
+		protocols := new(http.Protocols)
+		protocols.SetHTTP1(true)
+		protocols.SetHTTP2(true)
+		s.inner.Protocols = protocols
 	}
 
 	listen := func(network string, address string) (net.Listener, error) {

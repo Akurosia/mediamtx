@@ -751,6 +751,10 @@ components:
           deprecated: true
         webrtcIPsFromInterfaces:
           type: boolean
+        webrtcIPsFromInterfacesExcludeList:
+          type: array
+          items:
+            type: string
         webrtcIPsFromInterfacesList:
           type: array
           items:

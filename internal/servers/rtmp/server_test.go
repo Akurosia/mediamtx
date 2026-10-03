@@ -1,4 +1,4 @@
-package rtmp
+package rtmp_test
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"github.com/akurosia/mediamtx/internal/conf"
 	"github.com/akurosia/mediamtx/internal/defs"
 	"github.com/akurosia/mediamtx/internal/externalcmd"
+	"github.com/akurosia/mediamtx/internal/servers/rtmp"
 	"github.com/akurosia/mediamtx/internal/stream"
 	"github.com/akurosia/mediamtx/internal/test"
 	"github.com/akurosia/mediamtx/internal/unit"
@@ -79,7 +80,7 @@ func TestAuthError(t *testing.T) {
 						}
 					}
 
-					s := &Server{
+					s := &rtmp.Server{
 						Address:             "127.0.0.1:1939",
 						ReadTimeout:         conf.Duration(10 * time.Second),
 						WriteTimeout:        conf.Duration(10 * time.Second),
@@ -209,7 +210,7 @@ func TestServerPublish(t *testing.T) {
 					},
 				}
 
-				s := &Server{
+				s := &rtmp.Server{
 					Address:             "127.0.0.1:1939",
 					ReadTimeout:         conf.Duration(10 * time.Second),
 					WriteTimeout:        conf.Duration(10 * time.Second),
@@ -365,7 +366,7 @@ func TestServerRead(t *testing.T) {
 				},
 			}
 
-			s := &Server{
+			s := &rtmp.Server{
 				Address:             "127.0.0.1:1939",
 				ReadTimeout:         conf.Duration(10 * time.Second),
 				WriteTimeout:        conf.Duration(10 * time.Second),
@@ -476,6 +477,12 @@ func TestServerRead(t *testing.T) {
 					},
 				},
 			}, list)
+
+			conn.Close()
+			require.Eventually(t, func() bool {
+				list2, listErr2 := s.APIConnsList()
+				return listErr2 == nil && len(list2.Items) == 0
+			}, 5*time.Second, 10*time.Millisecond)
 		})
 	}
 }
