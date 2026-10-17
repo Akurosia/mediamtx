@@ -3,6 +3,7 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
 	"fmt"
 	"net"
@@ -169,6 +170,15 @@ var cli struct {
 	ValidateConf string `help:"check whether a configuration file is valid" placeholder:"path"`
 }
 
+type authUserChangeReq struct {
+	op       string
+	name     string
+	user     *conf.AuthInternalUser
+	password string
+	newKey   string
+	res      chan error
+}
+
 type configGlobalPatchReq struct {
 	conf conf.OptionalGlobal
 	res  chan error
@@ -231,6 +241,7 @@ type Core struct {
 	confWatcher     *confwatcher.ConfWatcher
 
 	// in
+	chAPIAuthUserChange          chan authUserChangeReq
 	chAPIConfigGlobalPatch       chan configGlobalPatchReq
 	chAPIConfigPathDefaultsPatch chan configPathDefaultsPatchReq
 	chAPIConfigPathAdd           chan configPathAddReq
@@ -321,6 +332,7 @@ func New(args []string) (*Core, bool) {
 	p := &Core{
 		ctx:                          ctx,
 		ctxCancel:                    ctxCancel,
+		chAPIAuthUserChange:          make(chan authUserChangeReq),
 		chAPIConfigGlobalPatch:       make(chan configGlobalPatchReq),
 		chAPIConfigPathDefaultsPatch: make(chan configPathDefaultsPatchReq),
 		chAPIConfigPathAdd:           make(chan configPathAddReq),
@@ -346,6 +358,10 @@ func New(args []string) (*Core, bool) {
 	}
 
 	p.confPath = confPath
+	if err := p.loadAuthUsers(loadedConf); err != nil {
+		fmt.Printf("ERR: %s\n", err)
+		return nil, false
+	}
 	p.conf.Store(loadedConf)
 
 	err = p.createResources(true)
@@ -383,6 +399,17 @@ func (p *Core) Log(level logger.Level, format string, args ...any) {
 func (p *Core) run() {
 	defer close(p.done)
 
+	// Watch external edits to users.json independently of mediamtx.yml.
+	// Polling also detects atomic file replacement by editors on Windows.
+	authUsersTicker := time.NewTicker(time.Second)
+	defer authUsersTicker.Stop()
+	var lastUserFileHash [32]byte
+	var userFilePresent bool
+	if contents, err := os.ReadFile(p.authUsersFile()); err == nil {
+		lastUserFileHash = sha256.Sum256(contents)
+		userFilePresent = true
+	}
+
 	confChanged := func() chan struct{} {
 		if p.confWatcher != nil {
 			return p.confWatcher.Watch()
@@ -408,11 +435,47 @@ outer:
 				break outer
 			}
 
-			err = p.reloadConf(newConf)
+			if err = p.loadAuthUsers(newConf); err == nil {
+				err = p.reloadConf(newConf)
+			}
 			if err != nil {
 				p.Log(logger.Error, "%s", err)
 				break outer
 			}
+
+		case <-authUsersTicker.C:
+			if p.conf.Load().AuthMethod != conf.AuthMethodInternal {
+				continue
+			}
+			contents, err := os.ReadFile(p.authUsersFile())
+			if err != nil {
+				if !os.IsNotExist(err) {
+					p.Log(logger.Error, "reading users.json: %s", err)
+				}
+				userFilePresent = false
+				continue
+			}
+			digest := sha256.Sum256(contents)
+			if userFilePresent && digest == lastUserFileHash {
+				continue
+			}
+			userFilePresent = true
+			lastUserFileHash = digest
+			if err := p.reloadAuthUsersFromFile(contents); err != nil {
+				p.Log(logger.Error, "ignoring invalid users.json change: %s", err)
+			} else {
+				p.Log(logger.Info, "updated internal users from users.json (without restarting streams)")
+			}
+
+		case req := <-p.chAPIAuthUserChange:
+			err := p.applyAuthUserChange(req)
+			if err == nil {
+				if contents, readErr := os.ReadFile(p.authUsersFile()); readErr == nil {
+					lastUserFileHash = sha256.Sum256(contents)
+					userFilePresent = true
+				}
+			}
+			req.res <- err
 
 		case req := <-p.chAPIConfigGlobalPatch:
 			newConf, err := p.doAPIConfigGlobalPatch(req.conf)
@@ -1526,6 +1589,90 @@ func (p *Core) APIConfigSnapshot() *conf.Conf {
 	return p.apiConfigSnapshot()
 }
 
+// applyAuthUserChange updates authentication in place without touching media listeners.
+// The core event loop serializes changes with ordinary configuration reloads.
+func (p *Core) applyAuthUserChange(req authUserChangeReq) error {
+	oldConf := p.conf.Load()
+	if oldConf.AuthMethod != conf.AuthMethodInternal {
+		return fmt.Errorf("user management requires internal authentication")
+	}
+	next := oldConf.Clone()
+	index := -1
+	for i, u := range next.AuthInternalUsers {
+		if string(u.User) == req.name {
+			index = i
+			break
+		}
+	}
+	switch req.op {
+	case "rotate":
+		if index < 0 || req.name == "any" || next.AuthInternalUsers[index].Pass == "" || !next.AuthInternalUsers[index].Pass.Check(req.password) {
+			return fmt.Errorf("invalid credentials")
+		}
+		next.AuthInternalUsers[index].StreamKey = conf.Credential(req.newKey)
+	case "add":
+		if req.user == nil || req.user.User == "" || req.user.User == "any" {
+			return fmt.Errorf("a non-empty, named user is required")
+		}
+		for _, u := range next.AuthInternalUsers {
+			if u.User == req.user.User {
+				return fmt.Errorf("user already exists")
+			}
+		}
+		next.AuthInternalUsers = append(next.AuthInternalUsers, *req.user)
+	case "patch":
+		if index < 0 {
+			return fmt.Errorf("user not found")
+		}
+		if req.user == nil {
+			return fmt.Errorf("missing user")
+		}
+		if req.name == "any" {
+			return fmt.Errorf("the default any user cannot be modified via this endpoint")
+		}
+		next.AuthInternalUsers[index] = *req.user
+		if string(req.user.User) != req.name {
+			for i, u := range next.AuthInternalUsers {
+				if i != index && u.User == req.user.User {
+					return fmt.Errorf("user already exists")
+				}
+			}
+		}
+	case "delete":
+		if index < 0 {
+			return fmt.Errorf("user not found")
+		}
+		if req.name == "any" {
+			return fmt.Errorf("the default any user cannot be removed via this endpoint")
+		}
+		next.AuthInternalUsers = append(next.AuthInternalUsers[:index], next.AuthInternalUsers[index+1:]...)
+	default:
+		return fmt.Errorf("unknown operation")
+	}
+	if err := next.Validate(nil); err != nil {
+		return err
+	}
+	// Publish configuration first, then update credentials under the auth manager mutex.
+	// The API, servers and active media sessions are not restarted.
+	if err := p.saveAuthUsers(next.AuthInternalUsers); err != nil {
+		return fmt.Errorf("saving users: %w", err)
+	}
+	p.conf.Store(next)
+	p.authManager.ReloadInternalUsers(next.AuthInternalUsers)
+	return nil
+}
+
+// APIAuthUserChange implements apiParent.
+func (p *Core) APIAuthUserChange(op, name string, user *conf.AuthInternalUser) error {
+	res := make(chan error)
+	select {
+	case p.chAPIAuthUserChange <- authUserChangeReq{op: op, name: name, user: user, res: res}:
+		return <-res
+	case <-p.ctx.Done():
+		return fmt.Errorf("terminated")
+	}
+}
+
 // APIConfigGlobalPatch implements apiParent.
 func (p *Core) APIConfigGlobalPatch(in conf.OptionalGlobal) error {
 	res := make(chan error)
@@ -1586,6 +1733,18 @@ func (p *Core) APIConfigPathsDelete(name string) error {
 	res := make(chan error)
 	select {
 	case p.chAPIConfigPathDelete <- configPathDeleteReq{name: name, res: res}:
+		return <-res
+	case <-p.ctx.Done():
+		return fmt.Errorf("terminated")
+	}
+}
+
+// APIAuthUserRotateKey changes a streamer's own key, checking the password again
+// in the serialized core event loop before updating storage.
+func (p *Core) APIAuthUserRotateKey(name, password, newKey string) error {
+	res := make(chan error)
+	select {
+	case p.chAPIAuthUserChange <- authUserChangeReq{op: "rotate", name: name, password: password, newKey: newKey, res: res}:
 		return <-res
 	case <-p.ctx.Done():
 		return fmt.Errorf("terminated")

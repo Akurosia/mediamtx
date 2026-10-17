@@ -30,6 +30,44 @@ func (p *testParent) Log(l logger.Level, s string, a ...any) {
 }
 
 func (p *testParent) APIConfigSnapshot() *conf.Conf { return p.conf }
+func (p *testParent) APIAuthUserRotateKey(name, password, newKey string) error {
+	for i := range p.conf.AuthInternalUsers {
+		u := &p.conf.AuthInternalUsers[i]
+		if string(u.User) == name && u.Pass != "" && u.Pass.Check(password) {
+			u.StreamKey = conf.Credential(newKey)
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid credentials")
+}
+
+func (p *testParent) APIAuthUserChange(op, name string, user *conf.AuthInternalUser) error {
+	next := p.conf.Clone()
+	switch op {
+	case "add":
+		next.AuthInternalUsers = append(next.AuthInternalUsers, *user)
+	case "patch":
+		for i := range next.AuthInternalUsers {
+			if string(next.AuthInternalUsers[i].User) == name {
+				next.AuthInternalUsers[i] = *user
+				break
+			}
+		}
+	case "delete":
+		for i := range next.AuthInternalUsers {
+			if string(next.AuthInternalUsers[i].User) == name {
+				next.AuthInternalUsers = append(next.AuthInternalUsers[:i], next.AuthInternalUsers[i+1:]...)
+				break
+			}
+		}
+	}
+	if err := next.Validate(nil); err != nil {
+		return err
+	}
+	p.conf = next
+	return nil
+}
+
 func (p *testParent) APIConfigGlobalPatch(in conf.OptionalGlobal) error {
 	newConf := p.conf.Clone()
 	newConf.PatchGlobal(&in)

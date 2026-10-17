@@ -12,6 +12,9 @@ func Redact(c *Conf) *Conf {
 		if c.AuthInternalUsers[i].Pass != "" {
 			c.AuthInternalUsers[i].Pass = Credential(redactedCredential)
 		}
+		if c.AuthInternalUsers[i].StreamKey != "" {
+			c.AuthInternalUsers[i].StreamKey = Credential(redactedCredential)
+		}
 	}
 
 	if c.PathDefaults.PublishPass != nil && *c.PathDefaults.PublishPass != "" {

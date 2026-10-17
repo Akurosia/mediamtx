@@ -56,6 +56,8 @@ type apiParent interface {
 	logger.Writer
 	APIConfigSnapshot() *conf.Conf
 	APIConfigGlobalPatch(conf.OptionalGlobal) error
+	APIAuthUserChange(string, string, *conf.AuthInternalUser) error
+	APIAuthUserRotateKey(string, string, string) error
 	APIConfigPathDefaultsPatch(conf.OptionalPath) error
 	APIConfigPathsAdd(string, conf.OptionalPath) error
 	APIConfigPathsPatch(string, conf.OptionalPath) error
@@ -106,6 +108,11 @@ func (a *API) Initialize() error {
 
 	group.GET("/config/global/get", a.onConfigGlobalGet)
 	group.PATCH("/config/global/patch", a.onConfigGlobalPatch)
+	group.POST("/auth/self/streamkey/rotate", a.onAuthSelfRotateKey)
+	group.GET("/config/auth-users/list", a.onAuthUsersList)
+	group.POST("/config/auth-users/add", a.onAuthUsersAdd)
+	group.PATCH("/config/auth-users/patch/:name", a.onAuthUsersPatch)
+	group.DELETE("/config/auth-users/delete/:name", a.onAuthUsersDelete)
 
 	group.GET("/config/path-defaults/get", a.onConfigPathDefaultsGet)
 	group.PATCH("/config/path-defaults/patch", a.onConfigPathDefaultsPatch)
@@ -314,6 +321,9 @@ func (a *API) middlewarePreflightRequests(ctx *gin.Context) {
 }
 
 func (a *API) middlewareAuth(ctx *gin.Context) {
+	if ctx.Request.Method == http.MethodPost && ctx.Request.URL.Path == "/v3/auth/self/streamkey/rotate" {
+		return
+	}
 	req := &auth.Request{
 		Action:               conf.AuthActionAPI,
 		Query:                ctx.Request.URL.RawQuery,
