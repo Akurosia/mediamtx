@@ -45,11 +45,13 @@ func ToStream(
 				}},
 			}
 
-			r.OnDataH265(track, func(pts int64, _ int64, au [][]byte) error {
-				pts = td.Decode(pts)
+			r.OnDataH265(track, func(pts int64, dts int64, au [][]byte) error {
+				decodedPTS := td.Decode(pts)
+				decodedDTS := decodedPTS + mpegtsTimestampDelta(dts, pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
-					PTS:     pts, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
+					PTS:     decodedPTS,
+					DTS:     &decodedDTS,
 					Payload: unit.PayloadH265(au),
 				})
 				return nil
@@ -64,11 +66,13 @@ func ToStream(
 				}},
 			}
 
-			r.OnDataH264(track, func(pts int64, _ int64, au [][]byte) error {
-				pts = td.Decode(pts)
+			r.OnDataH264(track, func(pts int64, dts int64, au [][]byte) error {
+				decodedPTS := td.Decode(pts)
+				decodedDTS := decodedPTS + mpegtsTimestampDelta(dts, pts)
 
 				(*subStream).WriteUnit(medi, medi.Formats[0], &unit.Unit{
-					PTS:     pts, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
+					PTS:     decodedPTS,
+					DTS:     &decodedDTS,
 					Payload: unit.PayloadH264(au),
 				})
 				return nil
@@ -274,4 +278,18 @@ func ToStream(
 	}
 
 	return medias, nil
+}
+
+// mpegtsTimestampDelta computes a signed DTS-PTS offset across the 33-bit
+// MPEG-TS timestamp wrap. DTS must be decoded relative to its PTS, not fed
+// independently into the shared TimeDecoder (which tracks presentation time).
+func mpegtsTimestampDelta(dts, pts int64) int64 {
+	const wrap = int64(1) << 33
+	delta := (dts - pts) % wrap
+	if delta > wrap/2 {
+		delta -= wrap
+	} else if delta < -wrap/2 {
+		delta += wrap
+	}
+	return delta
 }

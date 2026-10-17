@@ -77,13 +77,19 @@ func FromStream(
 							dtsExtractor.Initialize()
 						}
 
-						dts, err := dtsExtractor.Extract(u.Payload.(unit.PayloadH265), u.PTS)
-						if err != nil {
-							return err
+						var dts int64
+						if u.DTS != nil {
+							dts = *u.DTS
+						} else {
+							var err error
+							dts, err = dtsExtractor.Extract(u.Payload.(unit.PayloadH265), u.PTS)
+							if err != nil {
+								return err
+							}
 						}
 
 						sconn.SetWriteDeadline(time.Now().Add(writeTimeout))
-						err = (*w).WriteH265(
+						err := (*w).WriteH265(
 							track,
 							u.PTS, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
 							dts,
@@ -118,13 +124,19 @@ func FromStream(
 							dtsExtractor.Initialize()
 						}
 
-						dts, err := dtsExtractor.Extract(u.Payload.(unit.PayloadH264), u.PTS)
-						if err != nil {
-							return err
+						var dts int64
+						if u.DTS != nil {
+							dts = *u.DTS
+						} else {
+							var err error
+							dts, err = dtsExtractor.Extract(u.Payload.(unit.PayloadH264), u.PTS)
+							if err != nil {
+								return err
+							}
 						}
 
 						sconn.SetWriteDeadline(time.Now().Add(writeTimeout))
-						err = (*w).WriteH264(
+						err := (*w).WriteH264(
 							track,
 							u.PTS, // no conversion is needed since clock rate is 90khz in both MPEG-TS and RTSP
 							dts,

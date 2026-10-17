@@ -94,6 +94,10 @@ func (ssf *subStreamFormat) writeUnit(u *unit.Unit) {
 func (ssf *subStreamFormat) writeUnitInner(u *unit.Unit) error {
 	if ssf.streamFormat.alwaysAvailable {
 		u.PTS += ssf.streamFormat.ptsOffset
+		if u.DTS != nil {
+			dts := *u.DTS + ssf.streamFormat.ptsOffset
+			u.DTS = &dts
+		}
 
 		ssf.streamFormat.updateLastTime(
 			multiplyAndDivide2(time.Duration(u.PTS),
