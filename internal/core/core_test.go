@@ -159,18 +159,18 @@ func TestCoreHotReloadingSRTLA(t *testing.T) {
 	require.NotNil(t, initialSRTLAServer)
 	require.False(t, srtlaLinkerIsNil(srtServer))
 
-	newConf := p.conf.Load().Clone()
+	newConf := p.apiConfigSnapshot().Clone()
 	newConf.SRTLA = false
 	require.NoError(t, newConf.Validate(nil))
-	require.NoError(t, p.reloadConf(newConf))
+	require.NoError(t, p.applyConf(newConf))
 	require.Same(t, srtServer, p.srtServer)
 	require.Nil(t, p.srtlaServer)
 	require.True(t, srtlaLinkerIsNil(srtServer))
 
-	newConf = p.conf.Load().Clone()
+	newConf = p.apiConfigSnapshot().Clone()
 	newConf.SRTLA = true
 	require.NoError(t, newConf.Validate(nil))
-	require.NoError(t, p.reloadConf(newConf))
+	require.NoError(t, p.applyConf(newConf))
 	require.Same(t, srtServer, p.srtServer)
 	require.NotNil(t, p.srtlaServer)
 	require.NotSame(t, initialSRTLAServer, p.srtlaServer)

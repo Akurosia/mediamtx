@@ -36,9 +36,11 @@ import (
 	"github.com/akurosia/mediamtx/internal/rlimit"
 	"github.com/akurosia/mediamtx/internal/servers/hls"
 	"github.com/akurosia/mediamtx/internal/servers/moq"
+	"github.com/akurosia/mediamtx/internal/servers/omt"
 	"github.com/akurosia/mediamtx/internal/servers/rtmp"
 	"github.com/akurosia/mediamtx/internal/servers/rtsp"
 	"github.com/akurosia/mediamtx/internal/servers/srt"
+	"github.com/akurosia/mediamtx/internal/servers/srtla"
 	"github.com/akurosia/mediamtx/internal/servers/webrtc"
 	"github.com/akurosia/mediamtx/internal/upgrade"
 )
@@ -219,6 +221,8 @@ type Core struct {
 	webRTCServer    *webrtc.Server
 	srtServer       *srt.Server
 	moqServer       *moq.Server
+	srtlaServer     *srtla.Server
+	omtServer       *omt.Server
 	api             *api.API
 	confWatcher     *confwatcher.ConfWatcher
 
@@ -1019,6 +1023,42 @@ func (p *Core) createResources(initial bool) error {
 		p.moqServer = i
 	}
 
+	if p.conf.SRTLA &&
+		p.conf.SRT &&
+		p.srtlaServer == nil {
+		i := &srtla.Server{
+			Address:    p.conf.SRTLAAddress,
+			SRTAddress: p.conf.SRTAddress,
+			Metrics:    p.metrics,
+			Parent:     p,
+		}
+		err = i.Initialize()
+		if err != nil {
+			return err
+		}
+		p.srtlaServer = i
+		p.srtServer.SetSRTLALinker(i)
+	}
+
+	if p.conf.OMT && p.omtServer == nil {
+		i := &omt.Server{
+			Address:             p.conf.OMTAddress,
+			RTSPAddress:         p.conf.RTSPAddress,
+			ReadTimeout:         p.conf.ReadTimeout,
+			WriteTimeout:        p.conf.WriteTimeout,
+			RunOnConnect:        p.conf.RunOnConnect,
+			RunOnConnectRestart: p.conf.RunOnConnectRestart,
+			RunOnDisconnect:     p.conf.RunOnDisconnect,
+			ExternalCmdPool:     p.externalCmdPool,
+			PathManager:         p.pathManager,
+			Parent:              p,
+		}
+		if err = i.Initialize(); err != nil {
+			return err
+		}
+		p.omtServer = i
+	}
+
 	if p.conf.API &&
 		p.api == nil {
 		i := &api.API{
@@ -1318,6 +1358,24 @@ func (p *Core) closeResources(newConf *conf.Conf) error {
 		closeMetrics ||
 		closePathManager
 
+	closeSRTLAServer := newConf == nil ||
+		newConf.SRTLA != p.conf.SRTLA ||
+		newConf.SRTLAAddress != p.conf.SRTLAAddress ||
+		newConf.SRTAddress != p.conf.SRTAddress ||
+		newConf.SRT != p.conf.SRT ||
+		closeSRTServer
+
+	closeOMTServer := newConf == nil ||
+		newConf.OMT != p.conf.OMT ||
+		newConf.OMTAddress != p.conf.OMTAddress ||
+		newConf.RTSPAddress != p.conf.RTSPAddress ||
+		newConf.ReadTimeout != p.conf.ReadTimeout ||
+		newConf.WriteTimeout != p.conf.WriteTimeout ||
+		newConf.RunOnConnect != p.conf.RunOnConnect ||
+		newConf.RunOnConnectRestart != p.conf.RunOnConnectRestart ||
+		newConf.RunOnDisconnect != p.conf.RunOnDisconnect ||
+		closePathManager
+
 	closeAPI := newConf == nil ||
 		newConf.API != p.conf.API ||
 		newConf.APIAddress != p.conf.APIAddress ||
@@ -1352,6 +1410,14 @@ func (p *Core) closeResources(newConf *conf.Conf) error {
 		}
 	}
 
+	if closeSRTLAServer && p.srtlaServer != nil {
+		if p.srtServer != nil {
+			p.srtServer.SetSRTLALinker(nil)
+		}
+		p.srtlaServer.Close()
+		p.srtlaServer = nil
+	}
+
 	if closeSRTServer && p.srtServer != nil {
 		p.srtServer.Close()
 		p.srtServer = nil
@@ -1360,6 +1426,11 @@ func (p *Core) closeResources(newConf *conf.Conf) error {
 	if closeMoQServer && p.moqServer != nil {
 		p.moqServer.Close()
 		p.moqServer = nil
+	}
+
+	if closeOMTServer && p.omtServer != nil {
+		p.omtServer.Close()
+		p.omtServer = nil
 	}
 
 	if closeWebRTCServer && p.webRTCServer != nil {

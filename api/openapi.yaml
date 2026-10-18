@@ -878,6 +878,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AuthInternalUserPermission"
+        streamkey:
+          type: string
         pos:
           type: integer
           format: int64
@@ -923,6 +925,9 @@ components:
           nullable: true
           items:
             $ref: "#/components/schemas/AuthInternalUserPermission"
+        streamkey:
+          type: string
+          nullable: true
         user:
           type: string
           nullable: true
