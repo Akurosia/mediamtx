@@ -15,6 +15,7 @@ import (
 	"github.com/akurosia/mediamtx/internal/defs"
 	"github.com/akurosia/mediamtx/internal/logger"
 	"github.com/akurosia/mediamtx/internal/packetdumper"
+	"github.com/akurosia/mediamtx/internal/protocols/httpp"
 	ptls "github.com/akurosia/mediamtx/internal/protocols/tls"
 	"github.com/akurosia/mediamtx/internal/protocols/webrtc"
 	"github.com/akurosia/mediamtx/internal/protocols/whip"
@@ -108,7 +109,7 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 		URL: u,
 		HTTPClient: &http.Client{
 			Timeout:   time.Duration(s.ReadTimeout),
-			Transport: tr,
+			Transport: &httpp.LoggerTransport{Transport: tr, Log: s},
 		},
 		BearerToken:        params.Conf.WHEPBearerToken,
 		UDPReadBufferSize:  s.UDPReadBufferSize,

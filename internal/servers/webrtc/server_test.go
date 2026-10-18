@@ -39,6 +39,8 @@ func whipAnswer(body []byte) *pwebrtc.SessionDescription {
 }
 
 func checkClose(t *testing.T, closeFunc func() error) {
+	t.Helper()
+
 	require.NoError(t, closeFunc())
 }
 
@@ -63,6 +65,8 @@ func (p *dummyPath) RemoveReader(_ defs.PathRemoveReaderReq) {
 }
 
 func initializeTestServer(t *testing.T) *Server {
+	t.Helper()
+
 	pm := &test.PathManager{
 		FindPathConfImpl: func(req defs.PathFindPathConfReq) (*defs.PathFindPathConfRes, error) {
 			return &defs.PathFindPathConfRes{Conf: &conf.Path{}, User: req.AccessRequest.Credentials.User}, nil
@@ -443,15 +447,13 @@ func TestServerPublish(t *testing.T) {
 	defer checkClose(t, wc.Close)
 
 	err = track.WriteRTP(&rtp.Packet{
-		Header: rtp.Header{
-			Version:        2,
-			Marker:         true,
-			PayloadType:    96,
-			SequenceNumber: 123,
-			Timestamp:      45343,
-			SSRC:           563423,
-		},
-		Payload: []byte{1},
+		Version:        2,
+		Marker:         true,
+		PayloadType:    96,
+		SequenceNumber: 123,
+		Timestamp:      45343,
+		SSRC:           563423,
+		Payload:        []byte{1},
 	})
 	require.NoError(t, err)
 
@@ -581,15 +583,13 @@ func TestServerRead(t *testing.T) {
 			}},
 			&unit.Unit{
 				RTPPackets: []*rtp.Packet{{
-					Header: rtp.Header{
-						Version:        2,
-						Marker:         true,
-						PayloadType:    9,
-						SequenceNumber: 1123,
-						Timestamp:      45343,
-						SSRC:           563423,
-					},
-					Payload: []byte{1, 2},
+					Version:        2,
+					Marker:         true,
+					PayloadType:    9,
+					SequenceNumber: 1123,
+					Timestamp:      45343,
+					SSRC:           563423,
+					Payload:        []byte{1, 2},
 				}},
 			},
 			[]byte{1, 2},
@@ -1013,15 +1013,13 @@ func TestServerICERestart(t *testing.T) {
 	defer checkClose(t, wc.Close)
 
 	err = track.WriteRTP(&rtp.Packet{
-		Header: rtp.Header{
-			Version:        2,
-			Marker:         true,
-			PayloadType:    96,
-			SequenceNumber: 1,
-			Timestamp:      1,
-			SSRC:           1,
-		},
-		Payload: []byte{1},
+		Version:        2,
+		Marker:         true,
+		PayloadType:    96,
+		SequenceNumber: 1,
+		Timestamp:      1,
+		SSRC:           1,
+		Payload:        []byte{1},
 	})
 	require.NoError(t, err)
 
@@ -1082,15 +1080,13 @@ func TestServerICERestart(t *testing.T) {
 	require.NoError(t, err)
 
 	err = track.WriteRTP(&rtp.Packet{
-		Header: rtp.Header{
-			Version:        2,
-			Marker:         true,
-			PayloadType:    96,
-			SequenceNumber: 2,
-			Timestamp:      uint32(2),
-			SSRC:           1,
-		},
-		Payload: []byte{2},
+		Version:        2,
+		Marker:         true,
+		PayloadType:    96,
+		SequenceNumber: 2,
+		Timestamp:      uint32(2),
+		SSRC:           1,
+		Payload:        []byte{2},
 	})
 	require.NoError(t, err)
 

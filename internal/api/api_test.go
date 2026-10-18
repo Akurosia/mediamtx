@@ -2,6 +2,7 @@ package api //nolint:revive
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,10 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/akurosia/mediamtx/internal/auth"
 	"github.com/akurosia/mediamtx/internal/conf"
+	"github.com/akurosia/mediamtx/internal/defs"
 	"github.com/akurosia/mediamtx/internal/logger"
 	"github.com/akurosia/mediamtx/internal/test"
 )
@@ -21,6 +24,7 @@ import (
 type testParent struct {
 	log  func(_ logger.Level, _ string, _ ...any)
 	conf *conf.Conf
+	ids  []uuid.UUID
 }
 
 func (p *testParent) Log(l logger.Level, s string, a ...any) {
@@ -30,47 +34,12 @@ func (p *testParent) Log(l logger.Level, s string, a ...any) {
 }
 
 func (p *testParent) APIConfigSnapshot() *conf.Conf { return p.conf }
-func (p *testParent) APIAuthUserRotateKey(name, password, newKey string) error {
-	for i := range p.conf.AuthInternalUsers {
-		u := &p.conf.AuthInternalUsers[i]
-		if string(u.User) == name && u.Pass != "" && u.Pass.Check(password) {
-			u.StreamKey = conf.Credential(newKey)
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid credentials")
-}
 
-func (p *testParent) APIAuthUserChange(op, name string, user *conf.AuthInternalUser) error {
-	next := p.conf.Clone()
-	switch op {
-	case "add":
-		next.AuthInternalUsers = append(next.AuthInternalUsers, *user)
-	case "patch":
-		for i := range next.AuthInternalUsers {
-			if string(next.AuthInternalUsers[i].User) == name {
-				next.AuthInternalUsers[i] = *user
-				break
-			}
-		}
-	case "delete":
-		for i := range next.AuthInternalUsers {
-			if string(next.AuthInternalUsers[i].User) == name {
-				next.AuthInternalUsers = append(next.AuthInternalUsers[:i], next.AuthInternalUsers[i+1:]...)
-				break
-			}
-		}
-	}
-	if err := next.Validate(nil); err != nil {
+func (p *testParent) APIConfigGlobalPatch(_ context.Context, in conf.OptionalGlobal) error {
+	newConf := p.conf.Clone()
+	if err := newConf.PatchGlobal(&in); err != nil {
 		return err
 	}
-	p.conf = next
-	return nil
-}
-
-func (p *testParent) APIConfigGlobalPatch(in conf.OptionalGlobal) error {
-	newConf := p.conf.Clone()
-	newConf.PatchGlobal(&in)
 	if err := newConf.Validate(nil); err != nil {
 		return err
 	}
@@ -78,7 +47,7 @@ func (p *testParent) APIConfigGlobalPatch(in conf.OptionalGlobal) error {
 	return nil
 }
 
-func (p *testParent) APIConfigPathDefaultsPatch(in conf.OptionalPath) error {
+func (p *testParent) APIConfigPathDefaultsPatch(_ context.Context, in conf.OptionalPath) error {
 	newConf := p.conf.Clone()
 	newConf.PatchPathDefaults(&in)
 	if err := newConf.Validate(nil); err != nil {
@@ -88,7 +57,7 @@ func (p *testParent) APIConfigPathDefaultsPatch(in conf.OptionalPath) error {
 	return nil
 }
 
-func (p *testParent) APIConfigPathsAdd(name string, in conf.OptionalPath) error {
+func (p *testParent) APIConfigPathsAdd(_ context.Context, name string, in conf.OptionalPath) error {
 	newConf := p.conf.Clone()
 	if err := newConf.AddPath(name, &in); err != nil {
 		return err
@@ -100,7 +69,7 @@ func (p *testParent) APIConfigPathsAdd(name string, in conf.OptionalPath) error 
 	return nil
 }
 
-func (p *testParent) APIConfigPathsPatch(name string, in conf.OptionalPath) error {
+func (p *testParent) APIConfigPathsPatch(_ context.Context, name string, in conf.OptionalPath) error {
 	newConf := p.conf.Clone()
 	if err := newConf.PatchPath(name, &in); err != nil {
 		return err
@@ -112,7 +81,7 @@ func (p *testParent) APIConfigPathsPatch(name string, in conf.OptionalPath) erro
 	return nil
 }
 
-func (p *testParent) APIConfigPathsReplace(name string, in conf.OptionalPath) error {
+func (p *testParent) APIConfigPathsReplace(_ context.Context, name string, in conf.OptionalPath) error {
 	newConf := p.conf.Clone()
 	if err := newConf.ReplacePath(name, &in); err != nil {
 		return err
@@ -124,7 +93,7 @@ func (p *testParent) APIConfigPathsReplace(name string, in conf.OptionalPath) er
 	return nil
 }
 
-func (p *testParent) APIConfigPathsDelete(name string) error {
+func (p *testParent) APIConfigPathsDelete(_ context.Context, name string) error {
 	newConf := p.conf.Clone()
 	if err := newConf.RemovePath(name); err != nil {
 		return err
@@ -136,7 +105,147 @@ func (p *testParent) APIConfigPathsDelete(name string) error {
 	return nil
 }
 
+func (p *testParent) APIConfigInternalUsersSnapshot() []defs.APIInternalUser {
+	if len(p.ids) != len(p.conf.AuthInternalUsers) {
+		p.ids = make([]uuid.UUID, len(p.conf.AuthInternalUsers))
+		for i := range p.ids {
+			p.ids[i] = uuid.New()
+		}
+	}
+	c := conf.Redact(p.conf)
+	items := make([]defs.APIInternalUser, len(c.AuthInternalUsers))
+	for i, user := range c.AuthInternalUsers {
+		items[i] = defs.APIInternalUser{
+			ID:          p.ids[i],
+			Pos:         i + 1,
+			User:        user.User,
+			Pass:        user.Pass,
+			StreamKey:   user.StreamKey,
+			IPs:         user.IPs,
+			Permissions: user.Permissions,
+		}
+	}
+	return items
+}
+
+func (p *testParent) APIConfigInternalUsersAdd(_ context.Context, user conf.AuthInternalUser) (uuid.UUID, error) {
+	p.APIConfigInternalUsersSnapshot()
+	c := p.conf.Clone()
+	c.AuthInternalUsers = append(c.AuthInternalUsers, user)
+	if err := c.Validate(nil); err != nil {
+		return uuid.Nil, err
+	}
+	id := uuid.New()
+	p.ids = append(p.ids, id)
+	p.conf = c
+	return id, nil
+}
+
+func (p *testParent) APIConfigInternalUsersPatch(
+	_ context.Context,
+	id uuid.UUID,
+	optional conf.OptionalAuthInternalUser,
+) error {
+	p.APIConfigInternalUsersSnapshot()
+	for i, existing := range p.ids {
+		if existing == id {
+			c := p.conf.Clone()
+			user := &c.AuthInternalUsers[i]
+			if optional.User != nil {
+				user.User = *optional.User
+			}
+			if optional.Pass != nil && *optional.Pass != "<redacted>" {
+				user.Pass = *optional.Pass
+			}
+			if optional.StreamKey != nil && *optional.StreamKey != "<redacted>" {
+				user.StreamKey = *optional.StreamKey
+			}
+			if optional.IPs != nil {
+				user.IPs = *optional.IPs
+			}
+			if optional.Permissions != nil {
+				user.Permissions = *optional.Permissions
+			}
+			if err := c.Validate(nil); err != nil {
+				return err
+			}
+			p.conf = c
+			return nil
+		}
+	}
+	return conf.ErrAuthInternalUserNotFound
+}
+
+func (p *testParent) APIConfigInternalUsersReplace(_ context.Context, id uuid.UUID, user conf.AuthInternalUser) error {
+	p.APIConfigInternalUsersSnapshot()
+	for i, existing := range p.ids {
+		if existing == id {
+			c := p.conf.Clone()
+			if user.Pass == "<redacted>" {
+				user.Pass = c.AuthInternalUsers[i].Pass
+			}
+			c.AuthInternalUsers[i] = user
+			if err := c.Validate(nil); err != nil {
+				return err
+			}
+			p.conf = c
+			return nil
+		}
+	}
+	return conf.ErrAuthInternalUserNotFound
+}
+
+func (p *testParent) APIConfigInternalUsersDelete(_ context.Context, id uuid.UUID) error {
+	p.APIConfigInternalUsersSnapshot()
+	for i, existing := range p.ids {
+		if existing == id {
+			c := p.conf.Clone()
+			c.AuthInternalUsers = append(c.AuthInternalUsers[:i], c.AuthInternalUsers[i+1:]...)
+			if err := c.Validate(nil); err != nil {
+				return err
+			}
+			p.ids = append(p.ids[:i], p.ids[i+1:]...)
+			p.conf = c
+			return nil
+		}
+	}
+	return conf.ErrAuthInternalUserNotFound
+}
+
+func (p *testParent) APIAuthUserChange(op string, name string, user *conf.AuthInternalUser) error {
+	switch op {
+	case "add":
+		_, err := p.APIConfigInternalUsersAdd(context.Background(), *user)
+		return err
+	case "patch":
+		for i, existing := range p.conf.AuthInternalUsers {
+			if string(existing.User) == name {
+				return p.APIConfigInternalUsersReplace(context.Background(), p.ids[i], *user)
+			}
+		}
+	case "delete":
+		for i, existing := range p.conf.AuthInternalUsers {
+			if string(existing.User) == name {
+				return p.APIConfigInternalUsersDelete(context.Background(), p.ids[i])
+			}
+		}
+	}
+	return fmt.Errorf("user not found")
+}
+
+func (p *testParent) APIAuthUserRotateKey(name string, password string, newKey string) error {
+	for i, user := range p.conf.AuthInternalUsers {
+		if string(user.User) == name && user.Pass.Check(password) {
+			key := conf.Credential(newKey)
+			return p.APIConfigInternalUsersPatch(context.Background(), p.ids[i], conf.OptionalAuthInternalUser{StreamKey: &key})
+		}
+	}
+	return fmt.Errorf("invalid credentials")
+}
+
 func tempConf(t *testing.T, cnt string) *conf.Conf {
+	t.Helper()
+
 	fi := test.CreateTempFile(t, []byte(cnt))
 
 	cnf, _, err := conf.Load(fi, nil, nil)
@@ -146,6 +255,8 @@ func tempConf(t *testing.T, cnt string) *conf.Conf {
 }
 
 func httpRequest(t *testing.T, hc *http.Client, method string, ur string, in any, out any) {
+	t.Helper()
+
 	buf := func() io.Reader {
 		if in == nil {
 			return nil
@@ -178,6 +289,8 @@ func httpRequest(t *testing.T, hc *http.Client, method string, ur string, in any
 }
 
 func checkError(t *testing.T, body io.Reader, msg string) {
+	t.Helper()
+
 	var raw map[string]any
 	err := json.NewDecoder(body).Decode(&raw)
 	require.NoError(t, err)
@@ -185,6 +298,8 @@ func checkError(t *testing.T, body io.Reader, msg string) {
 }
 
 func checkOK(t *testing.T, body io.Reader) {
+	t.Helper()
+
 	var raw map[string]any
 	err := json.NewDecoder(body).Decode(&raw)
 	require.NoError(t, err)

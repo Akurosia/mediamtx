@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"runtime"
 
+	"github.com/google/uuid"
+
 	"github.com/akurosia/mediamtx/internal/conf"
 )
 
@@ -112,7 +114,10 @@ func (p *Core) saveAuthUsers(users []conf.AuthInternalUser) error {
 // MediaMTX configuration or disconnecting active media sessions. It is called
 // only from the core event loop, which also serializes API changes.
 func (p *Core) reloadAuthUsersFromFile(contents []byte) error {
-	current := p.conf.Load()
+	p.confMutex.RLock()
+	current := p.conf
+	currentIDs := append([]uuid.UUID(nil), p.internalUserIDs...)
+	p.confMutex.RUnlock()
 	if current.AuthMethod != conf.AuthMethodInternal {
 		return nil
 	}
@@ -131,7 +136,7 @@ func (p *Core) reloadAuthUsersFromFile(contents []byte) error {
 	if reflect.DeepEqual(next.AuthInternalUsers, current.AuthInternalUsers) {
 		return nil
 	}
-	p.conf.Store(next)
-	p.authManager.ReloadInternalUsers(next.AuthInternalUsers)
+	newIDs := matchInternalUserIDs(current.AuthInternalUsers, currentIDs, next.AuthInternalUsers)
+	p.applyInternalUsers(next, newIDs)
 	return nil
 }

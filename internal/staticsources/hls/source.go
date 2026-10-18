@@ -16,6 +16,7 @@ import (
 	"github.com/akurosia/mediamtx/internal/logger"
 	"github.com/akurosia/mediamtx/internal/packetdumper"
 	"github.com/akurosia/mediamtx/internal/protocols/hls"
+	"github.com/akurosia/mediamtx/internal/protocols/httpp"
 	ptls "github.com/akurosia/mediamtx/internal/protocols/tls"
 	"github.com/akurosia/mediamtx/internal/stream"
 )
@@ -98,7 +99,7 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 		URI: params.ResolvedSource,
 		HTTPClient: &http.Client{
 			Timeout:   time.Duration(s.ReadTimeout),
-			Transport: tr,
+			Transport: &httpp.LoggerTransport{Transport: tr, Log: s},
 			Jar:       jar,
 		},
 		OnDownloadPrimaryPlaylist: func(u string) {

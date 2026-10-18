@@ -18,6 +18,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/akurosia/mediamtx/internal/conf"
+	"github.com/akurosia/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/protocols/httpp"
 	"github.com/akurosia/mediamtx/internal/protocols/tls"
 )
 
@@ -94,7 +96,6 @@ func getStreamKey(req *Request) string {
 	if err != nil {
 		return ""
 	}
-
 	return v.Get("key")
 }
 
@@ -113,10 +114,19 @@ type Manager struct {
 	JWTIssuer          string
 	JWTAudience        string
 	ReadTimeout        time.Duration
+	Parent             logger.Writer
 
+	wrapTransport   func(http.RoundTripper) http.RoundTripper
 	mutex           sync.RWMutex
 	jwksLastRefresh time.Time
 	jwtKeyFunc      keyfunc.Keyfunc
+}
+
+// Initialize initializes the manager.
+func (m *Manager) Initialize() {
+	m.wrapTransport = func(tr http.RoundTripper) http.RoundTripper {
+		return &httpp.LoggerTransport{Transport: tr, Log: m.Parent}
+	}
 }
 
 // ReloadInternalUsers reloads InternalUsers.
@@ -150,12 +160,9 @@ func (m *Manager) Authenticate(req *Request) (string, *Error) {
 
 	if err != nil {
 		return "", &Error{
-			Wrapped:        err,
-			AskCredentials: req.EnableAskCredentials &&
-				(req.Credentials.User == "" &&
-					req.Credentials.Pass == "" &&
-					getStreamKey(req) == "" &&
-					token == ""),
+			Wrapped: err,
+			AskCredentials: req.EnableAskCredentials && req.Credentials.User == "" && req.Credentials.Pass == "" &&
+				getStreamKey(req) == "" && token == "",
 		}
 	}
 
@@ -167,19 +174,12 @@ func (m *Manager) authenticateInternal(req *Request) (string, error) {
 	defer m.mutex.RUnlock()
 
 	streamKey := getStreamKey(req)
-
 	for _, u := range m.InternalUsers {
 		if ok := m.authenticateWithUser(req, &u); ok {
-			switch {
-			case u.User == "any":
-				return req.Credentials.User, nil
-
-			case streamKey != "" && u.StreamKey != "":
+			if u.User != "any" && streamKey != "" && u.StreamKey != "" {
 				return string(u.User), nil
-
-			default:
-				return req.Credentials.User, nil
 			}
+			return req.Credentials.User, nil
 		}
 	}
 
@@ -205,12 +205,10 @@ func (m *Manager) authenticateWithUser(
 			if !u.StreamKey.Check(streamKey) {
 				return false
 			}
-
 		case req.CustomVerifyFunc != nil:
 			if ok := req.CustomVerifyFunc(string(u.User), string(u.Pass)); !ok {
 				return false
 			}
-
 		default:
 			if !u.User.Check(req.Credentials.User) || !u.Pass.Check(req.Credentials.Pass) {
 				return false
@@ -257,7 +255,7 @@ func (m *Manager) authenticateHTTP(req *Request, token string) (string, error) {
 
 	httpClient := &http.Client{
 		Timeout:   m.ReadTimeout,
-		Transport: tr,
+		Transport: m.wrapTransport(tr),
 	}
 
 	res, err := httpClient.Post(m.HTTPAddress, "application/json", bytes.NewReader(enc))
@@ -283,13 +281,13 @@ func (m *Manager) authenticateJWT(req *Request, token string) (string, error) {
 		return "", nil
 	}
 
+	if token == "" {
+		return "", fmt.Errorf("JWT not provided")
+	}
+
 	keyfunc, err := m.pullJWTJWKS()
 	if err != nil {
 		return "", err
-	}
-
-	if token == "" {
-		return "", fmt.Errorf("JWT not provided")
 	}
 
 	var opts []jwt.ParserOption
@@ -328,7 +326,7 @@ func (m *Manager) pullJWTJWKS() (jwt.Keyfunc, error) {
 
 		httpClient := &http.Client{
 			Timeout:   m.ReadTimeout,
-			Transport: tr,
+			Transport: m.wrapTransport(tr),
 		}
 
 		res, err := httpClient.Get(m.JWTJWKS)
@@ -336,6 +334,10 @@ func (m *Manager) pullJWTJWKS() (jwt.Keyfunc, error) {
 			return nil, err
 		}
 		defer res.Body.Close()
+
+		if res.StatusCode < 200 || res.StatusCode > 299 {
+			return nil, fmt.Errorf("JWKS server replied with code %d", res.StatusCode)
+		}
 
 		var raw json.RawMessage
 		err = json.NewDecoder(&customLimitReader{res.Body, maxInboundBodySize}).Decode(&raw)

@@ -13,6 +13,7 @@ import (
 	"github.com/akurosia/mediamtx/internal/conf"
 	"github.com/akurosia/mediamtx/internal/defs"
 	"github.com/akurosia/mediamtx/internal/logger"
+	"github.com/akurosia/mediamtx/internal/protocols/httpp"
 	ptls "github.com/akurosia/mediamtx/internal/protocols/tls"
 	pwebrtc "github.com/akurosia/mediamtx/internal/protocols/webrtc"
 	"github.com/akurosia/mediamtx/internal/protocols/whip"
@@ -105,7 +106,7 @@ func (d *Dest) Run(ctx context.Context) error {
 		OutboundDataChannels: pc.OutboundDataChannels,
 		HTTPClient: &http.Client{
 			Timeout:   time.Duration(d.ReadTimeout),
-			Transport: tr,
+			Transport: &httpp.LoggerTransport{Transport: tr, Log: d},
 		},
 		BearerToken: d.BearerToken,
 		Log:         d,

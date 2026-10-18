@@ -252,7 +252,7 @@ func (f *formatFMP4) initialize() bool {
 								codec.Width = w
 								paramsChanged = true
 							}
-							if h := h.Width(); codec.Height != h {
+							if h := h.Height(); codec.Height != h {
 								codec.Height = h
 								paramsChanged = true
 							}
@@ -328,7 +328,7 @@ func (f *formatFMP4) initialize() bool {
 							return nil
 						}
 
-						randomAccess := false
+						randomAccess := h265.IsRandomAccess(u.Payload.(unit.PayloadH265))
 						paramsChanged := false
 
 						for _, nalu := range u.Payload.(unit.PayloadH265) {
@@ -352,9 +352,6 @@ func (f *formatFMP4) initialize() bool {
 									codec.PPS = nalu
 									paramsChanged = true
 								}
-
-							case h265.NALUType_IDR_W_RADL, h265.NALUType_IDR_N_LP, h265.NALUType_CRA_NUT:
-								randomAccess = true
 							}
 						}
 
@@ -366,6 +363,7 @@ func (f *formatFMP4) initialize() bool {
 							if !randomAccess {
 								return nil
 							}
+
 							dtsExtractor = &h265.DTSExtractor{}
 							dtsExtractor.Initialize()
 						}
@@ -418,7 +416,7 @@ func (f *formatFMP4) initialize() bool {
 							return nil
 						}
 
-						randomAccess := false
+						randomAccess := h264.IsRandomAccess(u.Payload.(unit.PayloadH264))
 						paramsChanged := false
 
 						for _, nalu := range u.Payload.(unit.PayloadH264) {
@@ -435,9 +433,6 @@ func (f *formatFMP4) initialize() bool {
 									codec.PPS = nalu
 									paramsChanged = true
 								}
-
-							case h264.NALUTypeIDR:
-								randomAccess = true
 							}
 						}
 
